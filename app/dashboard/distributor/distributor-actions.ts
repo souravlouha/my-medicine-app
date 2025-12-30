@@ -3,27 +3,31 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-// ✅ 1. SHIPMENT RECEIVE FUNCTION (Fixed Case Sensitivity)
+// ✅ 1. SHIPMENT RECEIVE FUNCTION (Safe Fix - No 'include' used)
 export async function receiveShipmentAction(shipmentId: string) {
   try {
+    // ১. শুধু শিপমেন্ট খুঁজুন (রিলেশন ছাড়া)
     const shipment = await prisma.shipment.findUnique({
       where: { id: shipmentId },
-      // ⚠️ FIX: ShipmentItem (বড় হাতের S) এর বদলে shipmentItems (ছোট হাতের s) ব্যবহার করা হয়েছে।
-      // যদি আপনার স্কিমায় অন্য নাম থাকে (যেমন items), তবে সেটা ব্যবহার করতে হবে।
-      include: { shipmentItems: true } 
     });
 
     if (!shipment) return { success: false, error: "Not found" };
 
+    // ২. স্ট্যাটাস আপডেট
     await prisma.shipment.update({
       where: { id: shipmentId },
       data: { status: "DELIVERED" },
     });
 
+    // ৩. ব্যাচ আপডেট (Ownership Transfer)
     if (shipment.distributorId) {
-        // ⚠️ FIX: এখানেও shipmentItems ব্যবহার করতে হবে
-        // @ts-ignore (যদি টাইপস্ক্রিপ্ট ঝামেলা করে, তাই ইগনোর ট্যাগ রাখা হলো, তবে নাম ঠিক থাকলে লাগবে না)
-        const batchIds = shipment.shipmentItems ? shipment.shipmentItems.map((item: any) => item.batchId) : [];
+        // ⚠️ FIX: 'include' ব্যবহার না করে আলাদাভাবে আইটেমগুলো আনা হচ্ছে
+        // এতে রিলেশন নামের কোনো এরর আসবে না
+        const shipmentItems = await prisma.shipmentItem.findMany({
+            where: { shipmentId: shipmentId }
+        });
+
+        const batchIds = shipmentItems.map(item => item.batchId);
 
         if (batchIds.length > 0) {
             await prisma.batch.updateMany({
