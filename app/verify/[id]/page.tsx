@@ -9,9 +9,9 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
   const unit = await prisma.unit.findUnique({
     where: { uid: id },
     include: {
-      batch: true,          // ব্যাচের তথ্য (ওষুধের নাম, এক্সপায়ারি ডেট)
-      currentHolder: true,  // বর্তমানে কার কাছে আছে (Location)
-    },
+  batch: true,
+  owner: true, // ✅ স্কিমায় নাম আছে 'owner'
+},
   });
 
   // ৩. যদি ভুয়া QR কোড হয় (ডেটাবেসে না থাকে)
