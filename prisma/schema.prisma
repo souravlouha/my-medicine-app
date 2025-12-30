@@ -1,0 +1,143 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  customId    String   @unique 
+  name        String
+  email       String   @unique
+  password    String   
+  role        String   
+  phone       String?
+  location    String?   
+  fullAddress String?   
+  licenseNo   String?   
+  gstNo       String?   
+  
+  batches       Batch[]   
+  transfersTo   Transfer[] @relation("ToUser")
+  transfersFrom Transfer[] @relation("FromUser")
+  unitsOwned    Unit[]     
+  sales         Sale[]     
+  
+  // 🔥 নতুন যোগ করা হয়েছে: Shipment এর রিলেশন
+  sentShipments     Shipment[] @relation("ManuShipments")
+  receivedShipments Shipment[] @relation("DistShipments")
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Batch {
+  id             String     @id @default(cuid())
+  medicineName   String
+  mfgDate        DateTime
+  expDate        DateTime   
+  pricePerStrip  Float      
+  mrp            Float      @default(0.0) 
+  totalStrips    Int
+  currentStock   Int        
+  
+  status         String     @default("ACTIVE") 
+  
+  manufacturerId String
+  manufacturer   User       @relation(fields: [manufacturerId], references: [id])
+  
+  units          Unit[]     
+  transfers      Transfer[]
+
+  // 🔥 নতুন যোগ করা হয়েছে: Shipment Item এর সাথে লিংক
+  shipmentItems  ShipmentItem[]
+  
+  createdAt      DateTime   @default(now())
+}
+
+model Unit {
+  uid             String   @id 
+  batchId         String
+  batch           Batch    @relation(fields: [batchId], references: [id])
+  
+  status          String   @default("IN_MANUFACTURER") 
+  
+  currentHolderId String?
+  owner           User?    @relation(fields: [currentHolderId], references: [id])
+  
+  history         Json     @default("[]") 
+  
+  sale            Sale?    
+}
+
+model Transfer {
+  id             String   @id @default(cuid())
+  batchId        String
+  batch          Batch    @relation(fields: [batchId], references: [id])
+  
+  fromId         String
+  fromUser       User     @relation("FromUser", fields: [fromId], references: [id])
+  
+  toId           String
+  toUser         User     @relation("ToUser", fields: [toId], references: [id])
+  
+  quantity       Int
+  medicineName   String?
+  status         String   @default("PENDING") 
+  
+  invoiceNo      String?  @unique 
+  shipmentDate   DateTime @default(now())
+  receivedDate   DateTime?
+  
+  createdAt      DateTime @default(now())
+}
+
+model Sale {
+  id            String   @id @default(cuid())
+  retailerId    String
+  retailer      User     @relation(fields: [retailerId], references: [id])
+  
+  medicineName  String
+  batchId       String
+  unitUid       String   @unique
+  unit          Unit     @relation(fields: [unitUid], references: [uid])
+  
+  costPrice     Float    
+  salePrice     Float    
+  profit        Float    
+  
+  customerName  String?
+  customerPhone String?
+  
+  createdAt     DateTime @default(now())
+}
+
+// 🔥🔥🔥 নিচেই নতুন SHIPMENT মডেলগুলো যোগ করা হলো 🔥🔥🔥
+
+model Shipment {
+  id             String   @id @default(cuid())
+  manufacturerId String
+  distributorId  String
+  status         String   @default("IN_TRANSIT") // IN_TRANSIT, DELIVERED
+  totalAmount    Float
+  createdAt      DateTime @default(now())
+  
+  // Relations
+  manufacturer   User     @relation("ManuShipments", fields: [manufacturerId], references: [id])
+  distributor    User     @relation("DistShipments", fields: [distributorId], references: [id])
+  items          ShipmentItem[]
+}
+
+model ShipmentItem {
+  id         String   @id @default(cuid())
+  shipmentId String
+  batchId    String
+  quantity   Int
+  price      Float
+  
+  shipment   Shipment @relation(fields: [shipmentId], references: [id])
+  batch      Batch    @relation(fields: [batchId], references: [id])
+}
