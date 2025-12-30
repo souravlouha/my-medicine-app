@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { registerAction } from "../actions/auth"; 
+import { registerAction } from "../action/auth";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
