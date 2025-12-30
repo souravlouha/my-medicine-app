@@ -2,19 +2,19 @@
 import { prisma } from "@/lib/prisma";
 
 export default async function VerifyPage({ params }: { params: Promise<{ id: string }> }) {
-  // ১. Next.js 15 অনুযায়ী params থেকে ID বের করা
+  // ১. Next.js 15 অনুযায়ী params থেকে ID বের করা
   const { id } = await params;
 
   // ২. আসল ডেটাবেস থেকে তথ্য খোঁজা
   const unit = await prisma.unit.findUnique({
-    where: { uid: id },
+    where: { uid: id }, // আপনার স্কিমায় 'uid' হলো প্রাইমারি কি
     include: {
-  batch: true,
-  owner: true, // ✅ স্কিমায় নাম আছে 'owner'
-},
+      batch: true,
+      owner: true, // ✅ FIX: স্কিমায় নাম আছে 'owner', 'currentHolder' নয়
+    },
   });
 
-  // ৩. যদি ভুয়া QR কোড হয় (ডেটাবেসে না থাকে)
+  // ৩. যদি ভুয়া QR কোড হয় (ডেটাবেসে না থাকে)
   if (!unit) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -29,7 +29,7 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  // ৪. রিয়েল স্ট্যাটাস চেক করা
+  // ৪. রিয়েল স্ট্যাটাস চেক করা
   const isRecalled = unit.batch.isRecalled;
 
   return (
@@ -60,33 +60,38 @@ export default async function VerifyPage({ params }: { params: Promise<{ id: str
           </div>
 
           <div className="flex justify-between border-b border-gray-100 pb-3">
-            <span className="text-gray-500 text-sm">Type</span>
+            <span className="text-gray-500 text-sm">Status</span> {/* লেভেল চেইঞ্জ করে Status করা হলো */}
             <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded uppercase">
-                {unit.type}
+                {unit.status} {/* ✅ FIX: 'type' এর বদলে 'status' */}
             </span>
           </div>
 
           <div className="flex justify-between border-b border-gray-100 pb-3">
              <div className="text-left">
                 <span className="text-gray-500 text-xs block uppercase">Mfg Date</span>
-                <span className="text-gray-800 font-medium">{unit.batch.mfgDate}</span>
+                {/* ✅ FIX: Date অবজেক্টকে স্ট্রিংয়ে কনভার্ট করা হয়েছে */}
+                <span className="text-gray-800 font-medium">
+                  {new Date(unit.batch.mfgDate).toLocaleDateString()}
+                </span>
              </div>
              <div className="text-right">
                 <span className="text-gray-500 text-xs block uppercase">Exp Date</span>
                 <span className={`font-bold ${isRecalled ? 'text-red-600' : 'text-gray-800'}`}>
-                  {unit.batch.expDate}
+                  {/* ✅ FIX: Date অবজেক্টকে স্ট্রিংয়ে কনভার্ট করা হয়েছে */}
+                  {new Date(unit.batch.expDate).toLocaleDateString()}
                 </span>
              </div>
           </div>
 
-          {/* লোকেশন ট্র্যাকিং (রিয়েল ডেটা) */}
+          {/* লোকেশন ট্র্যাকিং (রিয়েল ডেটা) */}
           <div className="bg-blue-50 p-4 rounded-lg mt-4 border border-blue-100">
             <p className="text-xs text-blue-600 font-bold uppercase mb-1 flex items-center gap-1">
               <span>📍</span> Current Status
             </p>
             <p className="text-blue-900 font-medium text-sm">
-                {unit.currentHolder 
-                    ? `With: ${unit.currentHolder.name} (${unit.currentHolder.role})` 
+                {/* ✅ FIX: 'currentHolder' এর বদলে 'owner' ব্যবহার করা হয়েছে */}
+                {unit.owner 
+                    ? `With: ${unit.owner.name} (${unit.owner.role})` 
                     : "Stored at Manufacturing Plant"}
             </p>
           </div>
