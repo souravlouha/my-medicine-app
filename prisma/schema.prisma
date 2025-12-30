@@ -45,11 +45,14 @@ model Batch {
   currentStock   Int        
    
   status         String      @default("ACTIVE") 
-   
+  
+  // 🔥🔥🔥 নতুন যোগ করা হলো (FIXED) 🔥🔥🔥
+  // Recall Feature-এর জন্য। ডিফল্ট false মানে ওষুধ ভালো আছে।
+  isRecalled     Boolean     @default(false)
+
   manufacturerId String
   manufacturer   User        @relation(fields: [manufacturerId], references: [id])
 
-  // 🔥🔥🔥 নতুন যোগ করা হলো (FIXED) 🔥🔥🔥
   // এটি Optional (?) রাখা হয়েছে যাতে পুরনো ডাটা বা নতুন তৈরির সময় সমস্যা না হয়।
   distributorId  String?     
    
