@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-// ১. ক্যাটালগ সেভ ফাংশন
+// ১. ক্যাটালগ সেভ ফাংশন (Catalog Save Function)
 export async function upsertMedicineCatalog(data: { name: string, details: string, code: string, price: number }) {
   try {
     const activeUser = await prisma.user.findFirst();
@@ -30,7 +30,7 @@ export async function upsertMedicineCatalog(data: { name: string, details: strin
   }
 }
 
-// 🔥 ২. ক্যাটালগ ডিলিট ফাংশন (এটি মিসিং ছিল, এখন যোগ করা হলো)
+// ২. ক্যাটালগ ডিলিট ফাংশন (Delete Catalog Item)
 export async function deleteCatalogItem(id: string) {
   try {
     // ব্যাচ ডিলিট করা
@@ -45,7 +45,7 @@ export async function deleteCatalogItem(id: string) {
   }
 }
 
-// ৩. প্রোডাকশন ব্যাচ সেভ ফাংশন (তোমার আগের লজিক অপরিবর্তিত)
+// ৩. প্রোডাকশন ব্যাচ সেভ ফাংশন (Save Production Batch - FIXED)
 export async function saveProductionBatch(formData: any, cartons: any[]) {
   try {
     const activeUser = await prisma.user.findFirst();
@@ -62,6 +62,7 @@ export async function saveProductionBatch(formData: any, cartons: any[]) {
     // --- TRANSACTION START ---
     await prisma.$transaction(async (tx) => {
       
+      // ১. ব্যাচ তৈরি
       const batch = await tx.batch.create({
         data: {
           manufacturerId: activeUser.id,
@@ -77,14 +78,15 @@ export async function saveProductionBatch(formData: any, cartons: any[]) {
 
       console.log("✅ Batch Created ID:", batch.id);
 
+      // ২. ইউনিট (Strips) তৈরি
       const allStrips = [];
       for (const carton of cartons) {
         for (const box of carton.boxes) {
           for (const strip of box.strips) {
             allStrips.push({
-              id: String(strip.id),
+              uid: String(strip.id), // 🔥 FIXED: 'id' কে বদলে 'uid' করা হয়েছে (Schema অনুযায়ী)
               batchId: batch.id,
-              status: "ACTIVE", 
+              status: "IN_MANUFACTURER", // শুরুতে স্ট্যাটাস ফ্যাক্টরিতে থাকবে
             });
           }
         }
