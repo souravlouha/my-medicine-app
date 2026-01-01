@@ -102,7 +102,7 @@ Follow these steps to set up the project locally on your machine.
 3.  **Configure Environment Variables**
     Create a `.env` file in the root directory and add your database connection:
     ```env
-    DATABASE_URL="postgresql://user:password@ep-xyz.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    DATABASE_URL="postgresql://user:password@ep-xyz.
     ```
 
 4.  **Push Database Schema**
