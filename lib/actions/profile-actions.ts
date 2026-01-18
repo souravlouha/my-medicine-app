@@ -15,15 +15,16 @@ export async function updateFullProfileAction(userId: string, data: {
       where: { id: userId },
       data: {
         phone: data.phone as string,
-        // ফর্মের 'licenseNo' কে ডাটাবেসের 'licenseNumber' এ ম্যাপ করা হলো
-        licenseNumber: data.licenseNo as string,
-        // ফর্মের 'gstNo' কে ডাটাবেসের 'gstNumber' এ ম্যাপ করা হলো (যদি ফিল্ড থাকে)
-        // নোট: যদি আপনার স্কিমায় 'gstNumber' না থাকে, এই লাইনটি এরর দিতে পারে। 
-        // সেক্ষেত্রে এটি রিমুভ করে দিয়েন। তবে সাধারণত বিজনেসের জন্য এটা থাকে।
-        // gstNumber: data.gstNo as string, 
         
-        // ফর্মের 'fullAddress' কে ডাটাবেসের 'address' এ ম্যাপ করা হলো
+        // ✅ FIX: স্কিমাতে ফিল্ডের নাম 'licenseNo', তাই 'licenseNumber' এর বদলে এটি ব্যবহার করা হলো
+        licenseNo: data.licenseNo as string,
+        
+        // ✅ FIX: ফর্মের 'fullAddress' কে স্কিমার 'address' ফিল্ডে ম্যাপ করা হলো
         address: data.fullAddress as string,
+
+        // নোট: যদি আপনার স্কিমায় 'gstNumber' বা 'gstNo' নামে কোনো ফিল্ড থাকে, 
+        // তবেই নিচের লাইনটি আনকমেন্ট করবেন। অন্যথায় এটি এরর দিতে পারে।
+        // gstNumber: data.gstNo as string, 
       },
     });
 
