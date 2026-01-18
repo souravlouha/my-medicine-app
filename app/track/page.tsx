@@ -33,7 +33,7 @@ export default function TrackMedicinePage() {
     }
   };
 
-  // ২. ম্যানুয়ালি আইডি দিয়ে সার্চ করলে
+  // ২. ম্যানুয়ালি আইডি দিয়ে সার্চ করলে
   const handleManualSearch = () => {
     if (!manualBatchId) return;
     setLoading(true);
@@ -81,8 +81,8 @@ export default function TrackMedicinePage() {
             <Scanner 
                 onScan={handleScan}
                 styles={{ container: { height: 300 } }} // ক্যামেরার হাইট
+                // ✅ FIX: 'audio' প্রপার্টি রিমুভ করা হয়েছে কারণ এটি এখন আর সাপোর্টেড নয়
                 components={{
-                    audio: false, // শব্দ বন্ধ
                     onOff: true,  // ফ্ল্যাশ লাইট বাটন
                 }}
             />
