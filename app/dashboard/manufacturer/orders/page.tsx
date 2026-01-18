@@ -49,17 +49,18 @@ export default async function ManufacturerOrdersPage() {
                       <div className="flex items-center gap-3">
                          <h3 className="text-xl font-black text-gray-800">#{order.orderId}</h3>
                          {/* Status Badge */}
+                         {/* ✅ FIX: REJECTED এর বদলে CANCELLED ব্যবহার করা হলো */}
                          <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 
                             ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
-                             order.status === 'APPROVED' ? 'bg-blue-100 text-blue-800' :
-                             order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' : 
-                             order.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-gray-100'}`}>
+                              order.status === 'APPROVED' ? 'bg-blue-100 text-blue-800' :
+                              order.status === 'SHIPPED' ? 'bg-green-100 text-green-800' : 
+                              order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' : 'bg-gray-100'}`}>
                             {order.status === 'PENDING' && <Clock size={12}/>}
                             {order.status}
                          </span>
                       </div>
                       <p className="text-sm text-gray-500 mt-1">
-                         Ordered By: <span className="font-bold text-blue-600">{order.sender.name}</span> • {new Date(order.createdAt).toLocaleDateString()}
+                          Ordered By: <span className="font-bold text-blue-600">{order.sender.name}</span> • {new Date(order.createdAt).toLocaleDateString()}
                       </p>
                   </div>
 
@@ -73,28 +74,27 @@ export default async function ManufacturerOrdersPage() {
                <div className="bg-gray-50 rounded-xl p-4 mb-6">
                   <table className="w-full text-left text-sm">
                       <thead className="text-gray-400 font-bold border-b border-gray-200">
-                         <tr>
-                            <th className="pb-2">Product Name</th>
-                            <th className="pb-2 text-center">Quantity</th>
-                            <th className="pb-2 text-right">Price/Unit</th>
-                            <th className="pb-2 text-right">Total</th>
-                         </tr>
+                          <tr>
+                             <th className="pb-2">Product Name</th>
+                             <th className="pb-2 text-center">Quantity</th>
+                             <th className="pb-2 text-right">Price/Unit</th>
+                             <th className="pb-2 text-right">Total</th>
+                          </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                         {order.items.map((item) => (
-                            <tr key={item.id}>
-                               <td className="py-2 font-bold text-gray-700">{item.product.name}</td>
-                               <td className="py-2 text-center font-mono">{item.quantity}</td>
-                               <td className="py-2 text-right">₹{item.price}</td>
-                               <td className="py-2 text-right font-bold">₹{item.price * item.quantity}</td>
-                            </tr>
-                         ))}
+                          {order.items.map((item) => (
+                             <tr key={item.id}>
+                                <td className="py-2 font-bold text-gray-700">{item.product.name}</td>
+                                <td className="py-2 text-center font-mono">{item.quantity}</td>
+                                <td className="py-2 text-right">₹{item.price}</td>
+                                <td className="py-2 text-right font-bold">₹{item.price * item.quantity}</td>
+                             </tr>
+                          ))}
                       </tbody>
                   </table>
                </div>
 
                {/* Action Buttons (Connected with OrderActions) */}
-               {/* ✅ আপডেট: PENDING বা APPROVED হলে বাটন দেখাবে এবং status প্রপস পাস করা হলো */}
                {(order.status === "PENDING" || order.status === "APPROVED") && (
                   <OrderActions orderId={order.id} status={order.status} />
                )}
