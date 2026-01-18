@@ -41,9 +41,10 @@ export default function POSCharts({ salesData }: { salesData: any[] }) {
                   <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                 </linearGradient>
               </defs>
+              {/* ✅ FIX: value: any ব্যবহার করা হয়েছে টাইপ এরর এড়াতে */}
               <Tooltip 
                 contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                formatter={(value: number) => [`₹${value}`, 'Revenue']}
+                formatter={(value: any) => [`₹${value}`, 'Revenue']}
               />
               <Area type="monotone" dataKey="sales" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
             </AreaChart>
@@ -57,10 +58,11 @@ export default function POSCharts({ salesData }: { salesData: any[] }) {
         <div className="h-40 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData}>
+              {/* ✅ FIX: value: any ব্যবহার করা হয়েছে এবং Number() দিয়ে সেফ করা হয়েছে */}
               <Tooltip 
                 cursor={{fill: '#f0fdf4'}}
                 contentStyle={{ borderRadius: '8px', border: 'none' }}
-                formatter={(value: number) => [`₹${value.toFixed(0)}`, 'Profit']}
+                formatter={(value: any) => [`₹${Number(value).toFixed(0)}`, 'Profit']}
               />
               <Bar dataKey="profit" fill="#10B981" radius={[4, 4, 0, 0]} barSize={30} />
             </BarChart>
