@@ -85,8 +85,9 @@ export default function InventoryAnalytics({ inventory }: { inventory: any[] }) 
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                      ))}
                   </Pie>
+                  {/* ✅ FIX: value: any ব্যবহার করা হয়েছে টাইপ এরর এড়ানোর জন্য */}
                   <Tooltip 
-                     formatter={(value: number) => [`${value} Units`, 'Stock']}
+                     formatter={(value: any) => [`${value} Units`, 'Stock']}
                      contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '12px' }}
                   />
                </PieChart>
