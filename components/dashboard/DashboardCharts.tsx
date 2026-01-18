@@ -7,7 +7,7 @@ import {
 
 const COLORS = ['#2563EB', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6'];
 
-// 1. SALES TREND (Area Chart) - যেমন ছিল তেমনই থাক
+// 1. SALES TREND (Area Chart)
 export function SalesTrendChart({ data }: { data: any[] }) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[400px]">
@@ -23,9 +23,10 @@ export function SalesTrendChart({ data }: { data: any[] }) {
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} dy={10} />
           <YAxis axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} tickFormatter={(value) => `₹${value/1000}k`} />
+          {/* ✅ FIX: value: any ব্যবহার করা হয়েছে */}
           <Tooltip 
             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-            formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Revenue']}
+            formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Revenue']}
           />
           <Area type="monotone" dataKey="revenue" stroke="#2563EB" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
         </AreaChart>
@@ -34,7 +35,7 @@ export function SalesTrendChart({ data }: { data: any[] }) {
   );
 }
 
-// 2. WEEKLY SALES (Bar Chart) - ✅ NEW
+// 2. WEEKLY SALES (Bar Chart)
 export function WeeklySalesChart({ data }: { data: any[] }) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[400px]">
@@ -55,7 +56,7 @@ export function WeeklySalesChart({ data }: { data: any[] }) {
   );
 }
 
-// 3. INVENTORY PIE - যেমন ছিল তেমনই থাক
+// 3. INVENTORY PIE
 export function InventoryPieChart({ data }: { data: any[] }) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[350px] flex flex-col items-center justify-center">
@@ -82,7 +83,7 @@ export function InventoryPieChart({ data }: { data: any[] }) {
   );
 }
 
-// 4. TOP PRODUCTS (Improved Styling) - ✅ UPDATED
+// 4. TOP PRODUCTS
 export function TopProductsChart({ data }: { data: any[] }) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[350px]">
@@ -101,8 +102,9 @@ export function TopProductsChart({ data }: { data: any[] }) {
             width={120} 
             tick={{fontSize: 12, fontWeight: 'bold', fill: '#374151'}} 
           />
+          {/* ✅ FIX: value: any ব্যবহার করা হয়েছে */}
           <Tooltip 
-             formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Revenue']}
+             formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Revenue']}
              cursor={{fill: '#F3F4F6'}}
              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
           />
@@ -110,7 +112,7 @@ export function TopProductsChart({ data }: { data: any[] }) {
             dataKey="value" 
             fill="#8B5CF6" 
             radius={[0, 6, 6, 0]} 
-            barSize={32} // বার সাইজ একটু মোটা করা হয়েছে
+            barSize={32}
             background={{ fill: '#F9FAFB' }} 
           />
         </BarChart>
@@ -118,9 +120,8 @@ export function TopProductsChart({ data }: { data: any[] }) {
     </div>
   );
 }
-// ... আগের সব import এবং chart components (SalesTrend, WeeklySales etc.) থাকবে ...
 
-// 📊 5. PRODUCTION TREND CHART (New for Production Page) ✅
+// 5. PRODUCTION TREND CHART
 export function ProductionTrendChart({ data }: { data: any[] }) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[350px]">
@@ -131,7 +132,7 @@ export function ProductionTrendChart({ data }: { data: any[] }) {
           <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} dy={10} />
           <YAxis axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} />
           <Tooltip 
-            cursor={{fill: '#FFF7ED'}} // Light Orange Hover
+            cursor={{fill: '#FFF7ED'}}
             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
           />
           <Bar dataKey="quantity" name="Strips Produced" fill="#F97316" radius={[6, 6, 0, 0]} barSize={40} />
@@ -141,7 +142,7 @@ export function ProductionTrendChart({ data }: { data: any[] }) {
   );
 }
 
-// 📊 6. DISTRIBUTION SPLIT CHART (For Tracking Page)
+// 6. DISTRIBUTION SPLIT CHART
 export function DistributionPieChart({ data }: { data: any[] }) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[300px] flex flex-col items-center justify-center">
@@ -174,11 +175,9 @@ export function DistributionPieChart({ data }: { data: any[] }) {
   );
 }
 
-// ... আগের সব import এবং chart components থাকবে ...
-
-// 📊 7. SHIPMENT STATUS CHART (New for Shipment Page) ✅
+// 7. SHIPMENT STATUS CHART
 export function ShipmentStatusChart({ data }: { data: any[] }) {
-  const STATUS_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444']; // Blue, Green, Orange, Red
+  const STATUS_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
 
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[350px] flex flex-col items-center justify-center">
@@ -211,9 +210,7 @@ export function ShipmentStatusChart({ data }: { data: any[] }) {
   );
 }
 
-// ... আগের সব কোড এবং ইম্পোর্ট একই থাকবে ...
-
-// 📊 8. INVENTORY VALUE BY TYPE (Pie Chart) - ✅ NEW
+// 8. INVENTORY VALUE BY TYPE
 export function InventoryValueChart({ data }: { data: any[] }) {
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
@@ -234,7 +231,8 @@ export function InventoryValueChart({ data }: { data: any[] }) {
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Value']} />
+            {/* ✅ FIX: value: any ব্যবহার করা হয়েছে */}
+            <Tooltip formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Value']} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -250,7 +248,7 @@ export function InventoryValueChart({ data }: { data: any[] }) {
   );
 }
 
-// 📊 9. ORDER STATUS OVERVIEW (Bar Chart) - ✅ NEW
+// 9. ORDER STATUS OVERVIEW
 export function OrderStatusChart({ data }: { data: any[] }) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[350px]">
