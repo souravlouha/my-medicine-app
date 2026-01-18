@@ -1,237 +1,260 @@
 import { prisma } from "@/lib/prisma";
 import { cookies } from "next/headers";
-import ClientMedicineManager from "./ClientMedicineManager";
+import { redirect } from "next/navigation";
+import { SalesTrendChart, InventoryPieChart, TopProductsChart, WeeklySalesChart } from "@/components/dashboard/DashboardCharts"; 
+import { AlertTriangle, TrendingUp, Package, DollarSign, Users, Activity, Clock, Truck, FileText } from "lucide-react";
+import Link from "next/link";
+import ManufacturerHeader from "@/components/dashboard/ManufacturerHeader";
 
 export default async function ManufacturerDashboard() {
   const cookieStore = await cookies();
-  let userId = cookieStore.get("userId")?.value;
+  const userId = cookieStore.get("userId")?.value;
+  if (!userId) redirect("/login");
 
-  // ১. ইউজার ফলব্যাক (তোমার আগের লজিক)
-  if (!userId) {
-     const fallbackUser = await prisma.user.findFirst();
-     userId = fallbackUser?.id;
-  }
+  // =========================================================
+  // 1. DATA FETCHING
+  // =========================================================
+  const [user, inventory, shipments, recalls, batches, topPartners] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
 
-  // ২. রিয়েল ইনভেন্টরি স্টক (তোমার আগের লজিক)
-  const stockData = await prisma.batch.aggregate({
-    _sum: { currentStock: true },
-    where: { manufacturerId: userId }
+    prisma.inventory.findMany({
+      where: { userId },
+      include: { batch: { include: { product: true } } }
+    }),
+
+    prisma.shipment.findMany({
+      where: { manufacturerId: userId },
+      orderBy: { createdAt: 'desc' }, // Latest first for activity log
+      include: { items: { include: { batch: { include: { product: true } } } } }
+    }),
+
+    prisma.recall.findMany({
+      where: { issuedBy: userId },
+      orderBy: { createdAt: 'desc' }
+    }),
+
+    prisma.batch.findMany({
+      where: { manufacturerId: userId },
+      orderBy: { createdAt: 'desc' },
+      include: { product: true }
+    }),
+
+    prisma.shipment.groupBy({
+      by: ['distributorId'],
+      where: { manufacturerId: userId },
+      _sum: { totalAmount: true },
+      orderBy: { _sum: { totalAmount: 'desc' } },
+      take: 3
+    })
+  ]);
+
+  if (!user) return <div>User not found</div>;
+
+  // =========================================================
+  // 2. DATA PROCESSING
+  // =========================================================
+  
+  // A. KPI Metrics
+  const totalRevenue = shipments.reduce((sum, s) => sum + s.totalAmount, 0);
+  const totalStock = inventory.reduce((sum, item) => sum + item.currentStock, 0);
+  const activeRecalls = recalls.filter(r => r.status === "ACTIVE").length;
+
+  // B. Weekly Sales Data (Last 7 Days)
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weeklyDataMap = new Array(7).fill(0).map((_, i) => ({ day: days[i], sales: 0 }));
+  
+  shipments.forEach(s => {
+    const d = new Date(s.createdAt);
+    // শুধু চলতি সপ্তাহের ডাটা নিচ্ছি (সিম্পল লজিক)
+    if(new Date().getTime() - d.getTime() < 7 * 24 * 60 * 60 * 1000) {
+       weeklyDataMap[d.getDay()].sales += s.totalAmount;
+    }
   });
-  const totalStock = stockData._sum.currentStock || 0;
 
-  // ৩. লেটেস্ট ব্যাচ লিস্ট (টেবিলের জন্য - আগের লজিক)
-  const latestBatches = await prisma.batch.findMany({
-    where: { manufacturerId: userId },
-    orderBy: { createdAt: 'desc' },
-    take: 5 
-  });
+  // C. Monthly Revenue Trend
+  const chartData = shipments.reduce((acc: any[], curr) => {
+    const month = new Date(curr.createdAt).toLocaleString('default', { month: 'short' });
+    const existing = acc.find(item => item.name === month);
+    if (existing) existing.revenue += curr.totalAmount;
+    else acc.push({ name: month, revenue: curr.totalAmount });
+    return acc;
+  }, []);
 
-  // ৪. উইকলি চার্ট লজিক (তোমার আগের ডাইনামিক লজিক)
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
+  // D. Product Type Distribution
+  const typeDistribution = inventory.reduce((acc: any[], curr) => {
+    const type = curr.batch.product.type;
+    const existing = acc.find(item => item.name === type);
+    if (existing) existing.value += curr.currentStock;
+    else acc.push({ name: type, value: curr.currentStock });
+    return acc;
+  }, []);
 
-  const recentBatches = await prisma.batch.findMany({
-    where: {
-      manufacturerId: userId,
-      createdAt: { gte: sevenDaysAgo }
-    },
-    select: { createdAt: true, totalStrips: true }
-  });
-
-  const chartData = [];
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const dayName = days[d.getDay()];
-    
-    const dayBatches = recentBatches.filter(b => {
-      const bDate = new Date(b.createdAt);
-      return bDate.getDate() === d.getDate() && bDate.getMonth() === d.getMonth();
+  // E. Top Products
+  const productSales: Record<string, number> = {};
+  shipments.forEach(shipment => {
+    shipment.items.forEach(item => {
+      const pName = item.batch.product.name;
+      if (productSales[pName]) productSales[pName] += (item.price * item.quantity);
+      else productSales[pName] = (item.price * item.quantity);
     });
-
-    const totalProduced = dayBatches.reduce((sum, b) => sum + (b.totalStrips || 0), 0);
-    chartData.push({ day: dayName, count: totalProduced });
-  }
-  const maxVal = Math.max(...chartData.map(d => d.count), 10);
-
-  // 🔥 ৫. পাই চার্ট (PIE CHART) লজিক (নতুন অ্যাড করা হয়েছে)
-  // আমরা দেখব কোন মেডিসিন সবচেয়ে বেশি তৈরি হচ্ছে
-  const distributionData = await prisma.batch.groupBy({
-    by: ['medicineName'],
-    _sum: { totalStrips: true },
-    where: { manufacturerId: userId },
-    orderBy: { _sum: { totalStrips: 'desc' } },
-    take: 3 // টপ ৩টি মেডিসিন দেখাবে
   });
+  const topProductsData = Object.entries(productSales)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value).slice(0, 5);
 
-  // পাই চার্টের জন্য কালার সেট
-  const pieColors = ['#3B82F6', '#10B981', '#F59E0B']; // Blue, Green, Yellow
-  const totalProduction = distributionData.reduce((acc, curr) => acc + (curr._sum.totalStrips || 0), 0);
+  // F. 🆕 RECENT ACTIVITY LOG (Merged List)
+  const activities = [
+    ...shipments.map(s => ({ type: 'SHIPMENT', date: s.createdAt, title: `Shipment Sent`, desc: `ID: ${s.shipmentId} - ₹${s.totalAmount}` })),
+    ...batches.map(b => ({ type: 'BATCH', date: b.createdAt, title: `Batch Created`, desc: `${b.product.name} (${b.batchNumber})` })),
+    ...recalls.map(r => ({ type: 'RECALL', date: r.createdAt, title: `Recall Issued`, desc: `Reason: ${r.reason}` }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6); // Top 6 actions
+
+  // G. Alerts
+  const lowStockItems = inventory.filter(item => item.currentStock < 50);
+
+  const partnerDetails = await Promise.all(
+    topPartners.map(async (p) => {
+      const u = await prisma.user.findUnique({ where: { id: p.distributorId } });
+      return { name: u?.name, amount: p._sum.totalAmount };
+    })
+  );
 
   return (
-    <div className="space-y-8 pb-20 bg-gray-50/50 min-h-screen">
+    <div className="max-w-7xl mx-auto space-y-8 pb-10">
       
-      {/* --- TOP ROW: STATS & PIE CHART --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* CARD 1: LIVE STOCK (তোমার আগের কার্ড, ডিজাইন ইমপ্রুভড) */}
-        <div className="lg:col-span-1 bg-[#0D1B3E] p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden group text-white flex flex-col justify-between h-80">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/20 rounded-bl-full -mr-10 -mt-10 blur-xl transition-all group-hover:scale-110"></div>
-          
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="flex h-3 w-3 relative">
-                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                 <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500 border-2 border-[#0D1B3E]"></span>
-               </span>
-               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-200">System Live</p>
-            </div>
-            <h2 className="text-7xl font-black tracking-tighter mb-1">
-                {totalStock.toLocaleString()}
-            </h2>
-            <p className="text-sm font-medium text-gray-400">Total Active Units</p>
-          </div>
+      <ManufacturerHeader user={user} />
 
-          <div className="w-full bg-white/10 rounded-full h-12 flex items-center px-4 backdrop-blur-sm border border-white/5">
-             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-300 w-full text-center">
-               Last Sync: Just Now
-             </span>
-          </div>
+      {/* 1. KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+           <div className="p-4 bg-blue-50 text-blue-600 rounded-xl"><DollarSign size={24} /></div>
+           <div>
+              <p className="text-xs font-bold text-gray-400 uppercase">Total Revenue</p>
+              <h3 className="text-2xl font-black text-gray-800">₹{(totalRevenue / 100000).toFixed(2)}L</h3>
+              <p className="text-xs text-green-500 font-bold flex items-center"><TrendingUp size={12} className="mr-1"/> +12.5%</p>
+           </div>
         </div>
-
-        {/* CARD 2: PIE CHART (নতুন অ্যাড করা হয়েছে) */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col h-80 relative overflow-hidden">
-           <h3 className="text-sm font-black text-[#0D1B3E] uppercase tracking-widest mb-6">Production Distribution</h3>
-           
-           <div className="flex items-center justify-center gap-10 h-full">
-              {/* CSS Only Pie Chart using Conic Gradient */}
-              <div className="relative w-40 h-40 rounded-full flex items-center justify-center shadow-inner"
-                   style={{
-                     background: `conic-gradient(
-                       ${pieColors[0]} 0% ${distributionData[0] ? (distributionData[0]._sum.totalStrips! / totalProduction) * 100 : 0}%,
-                       ${pieColors[1]} 0% ${distributionData[1] ? ((distributionData[0]._sum.totalStrips! + distributionData[1]._sum.totalStrips!) / totalProduction) * 100 : 0}%,
-                       #E5E7EB 0% 100%
-                     )`
-                   }}>
-                 <div className="w-24 h-24 bg-white rounded-full flex flex-col items-center justify-center shadow-lg">
-                    <span className="text-2xl font-black text-[#0D1B3E]">{distributionData.length}</span>
-                    <span className="text-[8px] font-bold uppercase text-gray-400">Medicines</span>
-                 </div>
-              </div>
-
-              {/* Legend (Side Details) */}
-              <div className="space-y-4">
-                 {distributionData.map((item, idx) => (
-                   <div key={idx} className="flex items-center gap-4">
-                      <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: pieColors[idx] || 'gray' }}></div>
-                      <div>
-                        <p className="text-xs font-bold text-[#0D1B3E]">{item.medicineName.split('(')[0]}</p>
-                        <p className="text-[10px] font-bold text-gray-400">
-                          {((item._sum.totalStrips! / totalProduction) * 100).toFixed(1)}% Share
-                        </p>
-                      </div>
-                   </div>
-                 ))}
-                 {distributionData.length === 0 && <p className="text-xs text-gray-400 italic">No production data yet.</p>}
-              </div>
+        <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+           <div className="p-4 bg-indigo-50 text-indigo-600 rounded-xl"><Package size={24} /></div>
+           <div>
+              <p className="text-xs font-bold text-gray-400 uppercase">Total Units</p>
+              <h3 className="text-2xl font-black text-gray-800">{totalStock.toLocaleString()}</h3>
+           </div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-purple-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+           <div className="p-4 bg-purple-50 text-purple-600 rounded-xl"><Users size={24} /></div>
+           <div>
+              <p className="text-xs font-bold text-gray-400 uppercase">Active Partners</p>
+              <h3 className="text-2xl font-black text-gray-800">{partnerDetails.length}</h3>
+           </div>
+        </div>
+        <div className={`p-6 rounded-2xl border shadow-sm flex items-center gap-4 hover:shadow-md transition ${activeRecalls > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-green-100'}`}>
+           <div className={`p-4 rounded-xl ${activeRecalls > 0 ? 'bg-red-100 text-red-600' : 'bg-green-50 text-green-600'}`}><AlertTriangle size={24} /></div>
+           <div>
+              <p className={`text-xs font-bold uppercase ${activeRecalls > 0 ? 'text-red-400' : 'text-gray-400'}`}>Active Recalls</p>
+              <h3 className={`text-2xl font-black ${activeRecalls > 0 ? 'text-red-700' : 'text-gray-800'}`}>{activeRecalls}</h3>
            </div>
         </div>
       </div>
 
-      {/* --- MIDDLE ROW: WEEKLY BAR CHART (IMPROVED TOOLTIP) --- */}
-      <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100 relative">
-          <div className="flex justify-between items-center mb-12">
-             <div>
-               <h3 className="text-lg font-black text-[#0D1B3E] uppercase tracking-tighter">Weekly Throughput</h3>
-               <p className="text-xs text-gray-400 font-bold mt-1">Production volume over the last 7 days</p>
-             </div>
-             <div className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest">
-               Analytics
-             </div>
-          </div>
-          
-          <div className="flex items-end justify-between h-52 px-4 gap-6">
-            {chartData.map((s, index) => {
-              const heightPercentage = Math.round((s.count / maxVal) * 100);
-              const barHeight = heightPercentage > 0 ? `${heightPercentage}%` : '4px';
-              
-              return (
-                <div key={index} className="flex-1 flex flex-col items-center gap-4 group h-full justify-end relative">
-                  
-                  {/* 🔥 FIX: Tooltip এখন অনেক বেশি ভিজিবল এবং প্রফেশনাল */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 absolute -top-12 bg-gray-900 text-white text-[10px] font-bold py-2 px-3 rounded-lg shadow-xl transform translate-y-2 group-hover:translate-y-0 z-10 pointer-events-none whitespace-nowrap">
-                    {s.count.toLocaleString()} Units
-                    {/* Tooltip Arrow */}
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1 w-2 h-2 bg-gray-900 rotate-45"></div>
-                  </div>
-                  
-                  {/* The Bar with Gradient */}
-                  <div 
-                    style={{ height: barHeight }} 
-                    className={`w-full max-w-[50px] rounded-t-2xl transition-all duration-700 ease-out relative overflow-hidden group-hover:shadow-[0_10px_20px_-5px_rgba(59,130,246,0.5)] ${s.count > 0 ? 'bg-gradient-to-t from-[#0D1B3E] to-blue-600' : 'bg-gray-100'}`}
-                  >
-                  </div>
-                  
-                  {/* Day Label */}
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${s.count > 0 ? 'text-[#0D1B3E]' : 'text-gray-300'}`}>
-                    {s.day}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+      {/* 2. Main Charts (Area + Weekly Bar) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         <SalesTrendChart data={chartData} />
+         <WeeklySalesChart data={weeklyDataMap} />
       </div>
 
-      {/* --- BOTTOM SECTION: CATALOG & TABLE --- */}
-      <ClientMedicineManager />
+      {/* 3. Secondary Charts (Top Products + Pie) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+         <div className="lg:col-span-2">
+            <TopProductsChart data={topProductsData} />
+         </div>
+         <div className="lg:col-span-1">
+            <InventoryPieChart data={typeDistribution} />
+         </div>
+      </div>
 
-      <div className="bg-[#0D1B3E] p-10 rounded-[3rem] shadow-2xl text-white overflow-hidden relative">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl -mr-20 -mt-20"></div>
-        
-        <h3 className="text-xl font-black uppercase tracking-tighter mb-10 relative z-10">Live Production Tracker</h3>
-        <div className="overflow-x-auto relative z-10">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] border-b border-white/10">
-                <th className="pb-6 pl-4">Batch ID</th>
-                <th className="pb-6">Medicine</th>
-                <th className="pb-6">Mfg Date</th>
-                <th className="pb-6">Qty</th>
-                <th className="pb-6 text-right pr-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {latestBatches.map((b) => (
-                <tr key={b.id} className="hover:bg-white/5 transition-all duration-300 group">
-                  <td className="py-6 pl-4 font-mono text-[11px] font-bold text-gray-400 group-hover:text-white transition-colors">
-                    {b.id.substring(0, 15)}...
-                  </td>
-                  <td className="py-6 text-sm font-bold text-gray-200 group-hover:text-white">
-                    {b.medicineName.split('(')[0]}
-                    <span className="block text-[9px] text-gray-500 font-normal mt-1">{b.medicineName.split('(')[1]?.replace(')', '')}</span>
-                  </td>
-                  <td className="py-6 text-[11px] text-gray-400 font-bold">
-                    {new Date(b.mfgDate).toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </td>
-                  <td className="py-6 text-sm font-black text-blue-400">{b.totalStrips}</td>
-                  <td className="py-6 text-right pr-4">
-                    <span className="bg-green-500/10 text-green-400 text-[8px] font-black px-4 py-2 rounded-xl uppercase tracking-widest border border-green-500/20 shadow-[0_0_10px_rgba(74,222,128,0.1)]">
-                      Active
+      {/* 4. Bottom Section: Activity Log & Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+         
+         {/* 🆕 RECENT ACTIVITY LOG SECTION */}
+         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+               <h3 className="font-bold text-gray-800 flex items-center gap-2"><Clock size={18} /> Recent Activity Log</h3>
+               <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">Real-time</span>
+            </div>
+            <div className="divide-y divide-gray-50">
+               {activities.length === 0 && <p className="p-6 text-center text-gray-400">No recent activity.</p>}
+               {activities.map((act, i) => (
+                 <div key={i} className="p-4 flex items-start gap-4 hover:bg-gray-50 transition">
+                    <div className={`mt-1 p-2 rounded-lg ${
+                       act.type === 'SHIPMENT' ? 'bg-blue-100 text-blue-600' : 
+                       act.type === 'BATCH' ? 'bg-green-100 text-green-600' : 
+                       'bg-red-100 text-red-600'
+                    }`}>
+                       {act.type === 'SHIPMENT' ? <Truck size={16} /> : act.type === 'BATCH' ? <Package size={16} /> : <AlertTriangle size={16} />}
+                    </div>
+                    <div className="flex-1">
+                       <p className="text-sm font-bold text-gray-800">{act.title}</p>
+                       <p className="text-xs text-gray-500 mt-0.5">{act.desc}</p>
+                    </div>
+                    <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded">
+                       {new Date(act.date).toLocaleDateString()}
                     </span>
-                  </td>
-                </tr>
-              ))}
-              {latestBatches.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-20 text-center text-gray-500 text-[10px] font-black uppercase tracking-[0.3em]">No Data Available</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                 </div>
+               ))}
+            </div>
+         </div>
+
+         {/* Alerts & Partners Column */}
+         <div className="space-y-8">
+             {/* Alerts */}
+             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100 bg-red-50/50 flex justify-between items-center">
+                   <h3 className="font-bold text-gray-800 flex items-center gap-2"><Activity size={18} className="text-red-500"/> Action Needed</h3>
+                </div>
+                <div className="p-4 space-y-3">
+                   {lowStockItems.slice(0, 3).map(item => (
+                      <div key={item.id} className="flex justify-between items-center p-3 bg-red-50 rounded-xl border border-red-100">
+                         <div>
+                            <p className="text-xs font-bold text-red-800">Low Stock</p>
+                            <p className="text-[10px] text-red-500">{item.batch.product.name}</p>
+                         </div>
+                         <span className="bg-white text-red-600 px-2 py-1 rounded-lg text-xs font-bold shadow-sm">{item.currentStock} left</span>
+                      </div>
+                   ))}
+                   {batches.slice(0, 3).filter(b => new Date(b.expDate) < new Date(new Date().setMonth(new Date().getMonth() + 3))).map(batch => (
+                      <div key={batch.id} className="flex justify-between items-center p-3 bg-orange-50 rounded-xl border border-orange-100">
+                         <div>
+                            <p className="text-xs font-bold text-orange-800">Expiring</p>
+                            <p className="text-[10px] text-orange-500">{batch.product.name}</p>
+                         </div>
+                         <span className="text-orange-600 text-xs font-bold">⚠️</span>
+                      </div>
+                   ))}
+                   {lowStockItems.length === 0 && batches.filter(b => new Date(b.expDate) < new Date(new Date().setMonth(new Date().getMonth() + 3))).length === 0 && (
+                      <div className="text-center py-4 text-gray-400 text-xs">All clear! ✅</div>
+                   )}
+                </div>
+             </div>
+
+             {/* Top Distributors */}
+             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                   <h3 className="font-bold text-gray-800">🏆 Top Partners</h3>
+                </div>
+                <div className="divide-y divide-gray-50">
+                   {partnerDetails.map((p, i) => (
+                     <div key={i} className="p-4 flex items-center justify-between hover:bg-gray-50 transition">
+                        <div className="flex items-center gap-3">
+                           <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] ${i===0 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>#{i+1}</div>
+                           <p className="text-xs font-bold text-gray-700">{p.name}</p>
+                        </div>
+                        <p className="text-xs font-mono font-bold text-blue-600">₹{(p.amount! / 1000).toFixed(1)}k</p>
+                     </div>
+                   ))}
+                </div>
+             </div>
+         </div>
       </div>
     </div>
   );

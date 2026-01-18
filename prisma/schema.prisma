@@ -1,150 +1,436 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
+// ==========================================
+// 1. USER & AUTHENTICATION
+// ==========================================
 model User {
-  id          String   @id @default(cuid())
-  customId    String   @unique 
+  id          String   @id @default(uuid())
+  publicId    String?  @unique
+  
   name        String
   email       String   @unique
-  password    String   
-  role        String   
-  phone       String?
-  location    String?   
-  fullAddress String?   
-  licenseNo   String?   
-  gstNo       String?   
-   
-  batches        Batch[]   
-  transfersTo    Transfer[] @relation("ToUser")
-  transfersFrom  Transfer[] @relation("FromUser")
-  unitsOwned     Unit[]      
-  sales          Sale[]      
-   
-  // 🔥 Shipment Relations
-  sentShipments      Shipment[] @relation("ManuShipments")
-  receivedShipments  Shipment[] @relation("DistShipments")
-
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-}
-
-model Batch {
-  id             String      @id @default(cuid())
-  medicineName   String
-  mfgDate        DateTime
-  expDate        DateTime   
-  pricePerStrip  Float      
-  mrp            Float      @default(0.0) 
-  totalStrips    Int
-  currentStock   Int        
-   
-  status         String      @default("ACTIVE") 
+  password    String
+  role        Role     @default(MANUFACTURER)
   
-  // 🔥🔥🔥 নতুন যোগ করা হলো (FIXED) 🔥🔥🔥
-  // Recall Feature-এর জন্য। ডিফল্ট false মানে ওষুধ ভালো আছে।
-  isRecalled     Boolean     @default(false)
+  // 🏢 Company Profile
+  licenseNo   String?  
+  licenseExp  DateTime?
+  address     String?
+  phone       String?
+  geoLat      Float?    
+  geoLng      Float?
 
-  manufacturerId String
-  manufacturer   User        @relation(fields: [manufacturerId], references: [id])
+  // 🔗 Relations
+  products           Product[]    @relation("ProductOwner")
+  batches            Batch[]      @relation("BatchCreator")
+  
+  // 📉 Dashboard Data Sources
+  inventory          Inventory[]  
+  sales              SalesRecord[] 
+  
+  // 🚚 Supply Chain
+  sentShipments      Shipment[]   @relation("Sender")
+  receivedShipments  Shipment[]   @relation("Receiver")
+  
+  // 🆕 B2B Ordering
+  placedOrders       Order[]      @relation("PlacedOrders")   // Orders I placed
+  receivedOrders     Order[]      @relation("ReceivedOrders") // Orders I received
 
-  // এটি Optional (?) রাখা হয়েছে যাতে পুরনো ডাটা বা নতুন তৈরির সময় সমস্যা না হয়।
-  distributorId  String?     
-   
-  units          Unit[]      
-  transfers      Transfer[]
+  // 🔔 Alerts & Actions
+  notifications      Notification[] 
+  returnsSent        Return[]     @relation("ReturnSender")
+  returnsReceived    Return[]     @relation("ReturnReceiver")
+  auditLogs          AuditLog[]    
 
-  // Shipment Item Link
-  shipmentItems  ShipmentItem[]
-   
-  createdAt      DateTime   @default(now())
+  // 🔥 NEW ACTIVITY LOG (Added as requested)
+  activityLogs       ActivityLog[]
+
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 }
 
-model Unit {
-  uid             String   @id 
+enum Role {
+  MANUFACTURER
+  DISTRIBUTOR
+  RETAILER
+  ADMIN
+  CONSUMER
+}
+
+// ==========================================
+// 2. PRODUCT CATALOG (Master Data)
+// ==========================================
+model Product {
+  id              String   @id @default(uuid())
+  
+  productCode     String   @unique // Auto Generated (e.g., MED-1001)
+  basePrice       Float?   // Catalog Price
+  
+  name            String   
+  genericName     String?  
+  strength        String?  
+  type            MedicineType 
+  
+  storageTemp     String?  
+  isNarcotic      Boolean  @default(false) 
+  
+  manufacturerId  String
+  manufacturer    User     @relation("ProductOwner", fields: [manufacturerId], references: [id])
+  
+  batches         Batch[]
+  orderItems      OrderItem[] // Relation for Orders
+
+  createdAt       DateTime @default(now())
+}
+
+enum MedicineType {
+  TABLET
+  CAPSULE
+  SYRUP
+  INJECTION
+  CREAM
+  DROPS
+}
+
+// ==========================================
+// 3. BATCH & PRODUCTION
+// ==========================================
+model Batch {
+  id              String   @id @default(uuid())
+  batchNumber     String   @unique 
+  
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+  
+  manufacturerId  String
+  manufacturer    User     @relation("BatchCreator", fields: [manufacturerId], references: [id])
+  
+  mfgDate         DateTime
+  expDate         DateTime 
+  
+  mrp             Float
+  totalQuantity   Int        
+  
+  // 🔗 Tracking
+  inventory       Inventory[]
+  units           Unit[]
+  shipmentItems   ShipmentItem[]
+  
+  // 🆕 Hierarchy Tracking Relation
+  movements       BatchMovement[] 
+  
+  salesRecords    SalesRecord[] 
+  recalls         Recall[] 
+
+  createdAt       DateTime @default(now())
+}
+
+// ==========================================
+// 4. INVENTORY
+// ==========================================
+model Inventory {
+  id              String   @id @default(uuid())
+  
+  userId          String   
+  user            User     @relation(fields: [userId], references: [id])
+  
   batchId         String
   batch           Batch    @relation(fields: [batchId], references: [id])
-   
-  status          String   @default("IN_MANUFACTURER") 
-   
-  currentHolderId String?
-  owner           User?    @relation(fields: [currentHolderId], references: [id])
-   
-  history         Json     @default("[]") 
-   
-  sale            Sale?    
+  
+  currentStock    Int        
+  
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, batchId]) 
 }
 
-model Transfer {
-  id             String   @id @default(cuid())
-  batchId        String
-  batch          Batch    @relation(fields: [batchId], references: [id])
-   
-  fromId         String
-  fromUser       User     @relation("FromUser", fields: [fromId], references: [id])
-   
-  toId           String
-  toUser         User     @relation("ToUser", fields: [toId], references: [id])
-   
-  quantity       Int
-  medicineName   String?
-  status         String   @default("PENDING") 
-   
-  invoiceNo      String?  @unique 
-  shipmentDate   DateTime @default(now())
-  receivedDate   DateTime?
-   
-  createdAt      DateTime @default(now())
+// ==========================================
+// 5. UNIT / QR HIERARCHY
+// ==========================================
+model Unit {
+  id              String   @id @default(uuid())
+  uid             String   @unique 
+  type            UnitType 
+  
+  batchId         String
+  batch           Batch    @relation(fields: [batchId], references: [id])
+
+  parentId        String?  
+  parent          Unit?    @relation("UnitHierarchy", fields: [parentId], references: [id])
+  children        Unit[]   @relation("UnitHierarchy")
+
+  status          UnitStatus @default(CREATED)
+  currentHandlerId String?    
+  
+  scans           ScanHistory[]
+
+  createdAt       DateTime @default(now())
 }
 
-model Sale {
-  id             String   @id @default(cuid())
-  retailerId     String
-  retailer       User     @relation(fields: [retailerId], references: [id])
-   
-  medicineName   String
-  batchId        String
-  unitUid        String   @unique
-  unit           Unit     @relation(fields: [unitUid], references: [uid])
-   
-  costPrice      Float    
-  salePrice      Float    
-  profit         Float    
-   
-  customerName   String?
-  customerPhone  String?
-   
-  createdAt      DateTime @default(now())
+enum UnitType {
+  CARTON
+  BOX
+  STRIP
 }
 
-// 🔥 SHIPMENT MODELS 🔥
+enum UnitStatus {
+  CREATED
+  IN_TRANSIT
+  RECEIVED
+  SOLD
+  RECALLED
+  EXPIRED
+  RETURNED
+  DAMAGED
+}
 
+// ==========================================
+// 6. SHIPMENT & LOGISTICS
+// ==========================================
 model Shipment {
-  id             String   @id @default(cuid())
-  manufacturerId String
-  distributorId  String
-  status         String   @default("IN_TRANSIT") 
-  totalAmount    Float
-  createdAt      DateTime @default(now())
-   
-  // Relations
-  manufacturer   User     @relation("ManuShipments", fields: [manufacturerId], references: [id])
-  distributor    User     @relation("DistShipments", fields: [distributorId], references: [id])
-  items          ShipmentItem[]
+  id              String   @id @default(uuid())
+  shipmentId      String?  @unique 
+  
+  manufacturerId  String
+  sender          User     @relation("Sender", fields: [manufacturerId], references: [id])
+  
+  distributorId   String
+  receiver        User     @relation("Receiver", fields: [distributorId], references: [id])
+  
+  items           ShipmentItem[]
+  
+  status          ShipmentStatus @default(IN_TRANSIT)
+  totalAmount     Float
+  
+  vehicleNo       String?
+  driverPhone     String?
+  expectedDelivery DateTime?
+  
+  createdAt       DateTime @default(now())
+  receivedAt      DateTime?
 }
 
 model ShipmentItem {
-  id         String   @id @default(cuid())
-  shipmentId String
-  batchId    String
+  id          String   @id @default(uuid())
+  shipmentId  String
+  shipment    Shipment @relation(fields: [shipmentId], references: [id])
+  
+  batchId     String
+  batch       Batch    @relation(fields: [batchId], references: [id])
+  
+  quantity    Int
+  price       Float
+}
+
+enum ShipmentStatus {
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  REJECTED
+}
+
+// ==========================================
+// 7. B2B ORDER MANAGEMENT
+// ==========================================
+model Order {
+  id             String   @id @default(uuid())
+  orderId        String   @unique 
+  
+  senderId       String   
+  sender         User     @relation("PlacedOrders", fields: [senderId], references: [id])
+  
+  receiverId     String   
+  receiver       User     @relation("ReceivedOrders", fields: [receiverId], references: [id])
+
+  totalAmount    Float
+  status         OrderStatus @default(PENDING)
+  
+  items          OrderItem[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id])
+  
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  
   quantity   Int
-  price      Float
-   
-  shipment   Shipment @relation(fields: [shipmentId], references: [id])
-  batch      Batch    @relation(fields: [batchId], references: [id])
+  price      Float    
+}
+
+enum OrderStatus {
+  PENDING
+  APPROVED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// ==========================================
+// 8. SALES & ANALYTICS
+// ==========================================
+model SalesRecord {
+  id           String   @id @default(uuid())
+  
+  sellerId     String   
+  seller       User     @relation(fields: [sellerId], references: [id])
+  
+  batchId      String
+  batch        Batch    @relation(fields: [batchId], references: [id])
+  
+  quantity     Int        
+  totalPrice   Float      
+  buyerType    String?    
+  
+  date         DateTime @default(now())
+
+  @@index([sellerId, date]) 
+}
+
+// ==========================================
+// 9. NOTIFICATIONS & ALERTS
+// ==========================================
+model Notification {
+  id        String   @id @default(uuid())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  title     String   
+  message   String   
+  type      NotifType 
+  isRead    Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+}
+
+enum NotifType {
+  INFO      
+  WARNING   
+  ALERT      
+}
+
+// ==========================================
+// 10. RECALL & RETURNS
+// ==========================================
+model Recall {
+  id           String   @id @default(uuid())
+  
+  batchId      String
+  batch        Batch    @relation(fields: [batchId], references: [id])
+  
+  reason       String   
+  issuedBy     String   
+  
+  severity     String   @default("MEDIUM") 
+  actionType   String   @default("RETURN") 
+  
+  status       String   @default("ACTIVE") 
+  resolvedAt   DateTime? 
+  
+  createdAt    DateTime @default(now())
+}
+
+model Return {
+  id           String   @id @default(uuid())
+  
+  senderId     String
+  sender       User     @relation("ReturnSender", fields: [senderId], references: [id])
+  
+  receiverId   String
+  receiver     User     @relation("ReturnReceiver", fields: [receiverId], references: [id])
+  
+  batchId      String    
+  quantity     Int
+  reason       String    
+  status       String    @default("PENDING") 
+  
+  createdAt    DateTime @default(now())
+}
+
+// ==========================================
+// 11. PUBLIC SCAN & FRAUD DETECTION
+// ==========================================
+model ScanHistory {
+  id           String   @id @default(uuid())
+  unitId       String
+  unit         Unit     @relation(fields: [unitId], references: [id])
+  
+  ipAddress    String?
+  location     String?  
+  device       String?  
+  
+  scannedAt    DateTime @default(now())
+  isSuspicious Boolean @default(false) 
+}
+
+// ==========================================
+// 12. AUDIT LOGS (Security)
+// ==========================================
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  action    String   
+  details   String?
+  ipAddress String?
+  
+  timestamp DateTime @default(now())
+}
+
+// ==========================================
+// 13. GLOBAL SUPPLY CHAIN TRACKING (NEW)
+// ==========================================
+model BatchMovement {
+  id               String          @id @default(uuid())
+  
+  batchId          String
+  batch            Batch           @relation(fields: [batchId], references: [id])
+  
+  senderId         String
+  receiverId       String?         
+  
+  senderName       String
+  receiverName     String
+  
+  role             Role            
+  quantity         Int
+  status           String          @default("DELIVERED") 
+  location         String?
+  
+  parentId         String?         
+  parent           BatchMovement?  @relation("MovementHierarchy", fields: [parentId], references: [id])
+  children         BatchMovement[] @relation("MovementHierarchy")
+
+  createdAt        DateTime        @default(now())
+
+  @@index([batchId])
+  @@index([parentId])
+}
+
+// ==========================================
+// 14. ACTIVITY LOG (Requested)
+// ==========================================
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

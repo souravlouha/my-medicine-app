@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateFullProfileAction } from "@/app/dashboard/actions"; // সঠিক পাথ চেক করো
+import { updateFullProfileAction } from "@/app/_dashboard_old/actions"; // সঠিক পাথ চেক করো
 
 export default function EditProfileModal({ user, onClose }: { user: any, onClose: () => void }) {
   const [loading, setLoading] = useState(false);
