@@ -10,7 +10,7 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ✅ FIX: Environment Variable থেকে Base URL নেওয়া হচ্ছে (Localhost বা Vercel)
+  // ✅ FIX: Environment Variable থেকে Base URL নেওয়া হচ্ছে (Localhost বা Vercel)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
   // 1. Form States
@@ -51,7 +51,11 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     const res = await createAdvancedBatchAction(formData);
 
     if (res.success) {
-      setCreatedBatch({ id: res.batchId, no: res.batchNo });
+      // ✅ FIX: এখানে (res.batchId || "") এবং (res.batchNo || "") দেওয়া হলো টাইপ এরর ফিক্স করতে
+      setCreatedBatch({ 
+          id: res.batchId || "", 
+          no: res.batchNo || "" 
+      });
       router.refresh();
     } else {
       alert("❌ " + res.error);
@@ -89,7 +93,7 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
            {/* Loop 1: Cartons */}
            {Array.from({ length: totalCartons }).map((_, cIndex) => (
              <div key={cIndex} className="border-4 border-gray-800 rounded-3xl p-8 bg-white relative break-inside-avoid">
-                
+               
                 {/* Carton Header */}
                 <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6">
                    <div className="bg-white p-2 border border-gray-200 rounded-lg">
