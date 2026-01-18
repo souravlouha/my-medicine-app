@@ -1,14 +1,15 @@
 import { currentUser } from "@/lib/auth";
-import { prisma as db } from "@/lib/prisma"; // 👈 ফিক্স: আপনার ফাইলের নাম prisma.ts তাই এখান থেকেই ইমপোর্ট করতে হবে
+import { prisma as db } from "@/lib/prisma"; 
 import { formatCurrency } from "@/lib/formatters";
 import { ActivityLog } from "@/components/dashboard/activity-log";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, CreditCard, TrendingUp, Store, ShoppingCart, DollarSign } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button"; // 👈 এটা Step 2 তে বানাচ্ছি
+import { Button } from "@/components/ui/button";
 
 export default async function RetailerDashboard() {
-  const user = await currentUser();
+  // ✅ FIX: 'as any' ব্যবহার করা হলো যাতে shopName এবং licenseNumber অ্যাক্সেস করা যায়
+  const user = await currentUser() as any;
 
   // ডাটাবেস থেকে ডাটা আনা (সেফটি চেক সহ)
   const salesCount = await db.order.count({ 
