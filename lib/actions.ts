@@ -5,7 +5,7 @@ export async function createBatchWithStock(data: any) {
     // ১. ইনপুট ডাটাগুলো নিয়ে নিন
     const { 
       manufacturerId, 
-      medicineName, // এটি আমরা Product টেবিলে খুঁজব
+      medicineName, 
       mfgDate, 
       expDate, 
       pricePerStrip, 
@@ -25,7 +25,7 @@ export async function createBatchWithStock(data: any) {
         throw new Error(`Manufacturer not found with ID: ${manufacturerId}`);
       }
 
-      // ✅ FIX: ২.২: প্রোডাক্ট খোঁজা অথবা তৈরি করা (কারণ ব্যাচের জন্য productId লাগবে)
+      // ২.২: প্রোডাক্ট খোঁজা অথবা তৈরি করা
       let product = await tx.product.findFirst({
         where: { 
             name: medicineName,
@@ -33,15 +33,15 @@ export async function createBatchWithStock(data: any) {
         }
       });
 
-      // যদি প্রোডাক্ট না থাকে, তবে অটোমেটিক তৈরি করে নেব (যাতে এরর না খায়)
+      // যদি প্রোডাক্ট না থাকে, তবে অটোমেটিক তৈরি করে নেব
       if (!product) {
         const pCount = await tx.product.count();
         product = await tx.product.create({
             data: {
                 name: medicineName,
                 productCode: `AUTO-${pCount + 1}`,
-                genericName: medicineName, // ডিফল্ট
-                type: "TABLET",            // ডিফল্ট
+                genericName: medicineName,
+                type: "TABLET", // ডিফল্ট Enum
                 strength: "N/A",
                 storageTemp: "Room Temp",
                 basePrice: parseFloat(pricePerStrip || "0"),
@@ -50,23 +50,23 @@ export async function createBatchWithStock(data: any) {
         });
       }
 
-      // ✅ FIX: ২.৩: ব্যাচ তৈরি করা (সঠিক স্কিমা ফিল্ড ব্যবহার করে)
+      // ২.৩: ব্যাচ তৈরি করা
       const bCount = await tx.batch.count();
       const autoBatchNumber = `B-${Date.now().toString().slice(-6)}-${bCount}`;
 
       const newBatch = await tx.batch.create({
         data: {
-          batchNumber: autoBatchNumber, // ব্যাচ নম্বর জেনারেট করা হলো
-          productId: product.id,        // medicineName এর বদলে productId
+          batchNumber: autoBatchNumber,
+          productId: product.id,
           manufacturerId: manufacturerId,
           mrp: parseFloat(mrp),
-          totalQuantity: parseInt(totalStrips), // totalStrips -> totalQuantity
+          totalQuantity: parseInt(totalStrips),
           mfgDate: new Date(mfgDate),
           expDate: new Date(expDate),
         },
       });
 
-      // ✅ FIX: ২.৪: ইনভেন্টরি আপডেট (স্টক ব্যাচ টেবিলে থাকে না, ইনভেন্টরিতে থাকে)
+      // ২.৪: ইনভেন্টরি আপডেট
       await tx.inventory.create({
         data: {
             userId: manufacturerId,
@@ -75,20 +75,20 @@ export async function createBatchWithStock(data: any) {
         }
       });
 
-      // ২.৫: ইউনিট বা QR কোড ডাটা তৈরি করা (অপশনাল)
+      // ২.৫: ইউনিট ডাটা তৈরি করা
       const unitsData = Array.from({ length: parseInt(totalStrips) }).map(() => ({
         uid: `UNIT-${newBatch.id}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
         batchId: newBatch.id,
-        currentHandlerId: manufacturerId, // মালিকানা সেট করা হলো
-        type: "STRIP", // টাইপ বলে দেওয়া হলো
-        status: "CREATED",
+        currentHandlerId: manufacturerId,
+        type: "STRIP",  
+        status: "CREATED", 
       }));
 
       // ইউনিট সেভ করা
       if (unitsData.length > 0) {
-        // @ts-ignore
+        // ✅ FIX: 'as any' ব্যবহার করা হলো টাইপ এরর এড়ানোর জন্য
         await tx.unit.createMany({
-          data: unitsData,
+          data: unitsData as any, 
         });
       }
 
