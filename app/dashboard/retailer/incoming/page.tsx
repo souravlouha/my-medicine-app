@@ -16,27 +16,21 @@ export default async function IncomingStockPage() {
     );
   }
 
-  // ✅ FIX: Explicitly typing shipments array
+  // ✅ FIX: টাইপ সেফটির জন্য explicit type
   let shipments: any[] = [];
   let errorMsg = "";
 
   try {
-    // ২. শিপমেন্ট খোঁজা (রিলেশন নামগুলো এখানে গুরুত্বপূর্ণ)
+    // ২. শিপমেন্ট খোঁজা
     shipments = await prisma.shipment.findMany({
       where: {
-        distributorId: user.id, // আপনার আইডি
+        distributorId: user.id,
         status: "IN_TRANSIT"
       },
       include: {
-        // রিলেশন নামগুলো ঠিক করার চেষ্টা:
-        // আপনার স্কিমাতে যদি 'manufacturer' নামে রিলেশন না থাকে, তবে এটি 'User' বা 'sender' হতে পারে।
-        // সেফটির জন্য আমরা এখন শুধু 'shipmentItems' বা 'ShipmentItem' ট্রাই করব।
-        
-        manufacturer: true, // যদি এরর দেয়, বুঝবেন এই নামটা ভুল
-        
-        // কমন ভুল: স্কিমাতে নাম 'ShipmentItem' (বড় হাতের) হতে পারে
-        // আমরা এখানে 'ShipmentItem' ব্যবহার করছি কারণ টেবিলে নাম সেটাই ছিল
-        ShipmentItem: { 
+        // ✅ FIX: রিলেশন নামগুলো আপনার স্কিমা অনুযায়ী ঠিক করা হলো
+        sender: true,   // আগে ছিল manufacturer (ভুল)
+        items: {        // আগে ছিল ShipmentItem (ভুল)
           include: {
             batch: { include: { product: true } }
           }
@@ -46,12 +40,13 @@ export default async function IncomingStockPage() {
     });
   } catch (error: any) {
     console.error("Prisma Error:", error);
-    // যদি উপরের কোড ফেইল করে, আমরা রিলেশন ছাড়াই ডেটা আনার চেষ্টা করব (ফলব্যাক)
+    // ফলব্যাক: যদি রিলেশনে সমস্যা হয়, শুধু বেসিক ডাটা আনবে
     try {
         shipments = await prisma.shipment.findMany({
-            where: { distributorId: user.id, status: "IN_TRANSIT" }
+            where: { distributorId: user.id, status: "IN_TRANSIT" },
+            include: { sender: true } // অন্তত সেন্ডারের নামটা আনার চেষ্টা
         });
-        errorMsg = "Note: Item details could not be loaded due to a system error, but shipments are listed.";
+        errorMsg = "Note: Some item details could not be loaded, but shipments are listed.";
     } catch (e) {
         errorMsg = "Failed to load shipments. Please contact support.";
     }
@@ -76,9 +71,9 @@ export default async function IncomingStockPage() {
       ) : (
         <div className="grid gap-6">
           {shipments.map((shipment: any) => {
-             // রিলেশন নাম হ্যান্ডেল করা (ShipmentItem নাকি shipmentItems)
-             const items = shipment.ShipmentItem || shipment.shipmentItems || [];
-             const senderName = shipment.manufacturer?.name || "Distributor";
+             // ✅ FIX: সঠিক রিলেশন নাম ব্যবহার করা হচ্ছে
+             const items = shipment.items || [];
+             const senderName = shipment.sender?.name || "Distributor";
 
              return (
                 <div key={shipment.id} className="bg-white border p-6 rounded-xl shadow-sm hover:shadow-md transition">
