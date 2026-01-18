@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma"; // ✅ Fix: db -> prisma
+import { prisma } from "@/lib/prisma"; 
 import { formatCurrency } from "@/lib/formatters";
 import { ActivityLog } from "@/components/dashboard/activity-log";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,17 +8,18 @@ import { Package, CreditCard, TrendingUp, Store } from "lucide-react";
 export default async function DashboardPage() {
   const session = await auth();
   
-  // ১. ড্যাশবোর্ডের জন্য ডাটা ফেচ
   const user = session?.user;
   
-  // ✅ Fix: db.order -> prisma.order
+  // ✅ FIX: userId এর বদলে senderId ব্যবহার করা হলো কারণ Order টেবিলে userId নেই
+  // Sales Count = কতগুলো অর্ডারে আমি Sender ছিলাম
   const salesCount = await prisma.order.count({ 
-      where: { userId: user?.id } 
+      where: { senderId: user?.id } 
   }) || 0;
   
-  // ✅ Fix: db.medicine -> prisma.product (medicine টেবিল আপনার স্কিমায় নেই, প্রোডাক্ট হবে)
+  // Product Count
+  // medicine টেবিল আপনার স্কিমায় নেই, তাই product টেবিল ব্যবহার করা হচ্ছে
   const medicineCount = await prisma.product.count({ 
-      // where: { userId: user?.id } // প্রোডাক্ট সাধারণত গ্লোবাল হয়, তাই শর্ত নাও লাগতে পারে
+      // where: { userId: user?.id } // প্রোডাক্ট সাধারণত গ্লোবাল হয় বা manufacturerId থাকে, তাই আপাতত সব কাউন্ট করা হচ্ছে
   }) || 0;
   
   // ফাইন্যান্সিয়াল ডাটা (ডেমো)
