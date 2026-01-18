@@ -8,18 +8,18 @@ import { Package, CreditCard, TrendingUp, Store } from "lucide-react";
 export default async function DashboardPage() {
   const session = await auth();
   
-  const user = session?.user;
+  // ✅ FIX: Type Error এড়ানোর জন্য 'as any' ব্যবহার করা হলো
+  // কারণ NextAuth এর ডিফল্ট টাইপে shopName বা licenseNumber নেই, তাই জোর করে রিড করা হচ্ছে
+  const user = session?.user as any;
   
-  // ✅ FIX: userId এর বদলে senderId ব্যবহার করা হলো কারণ Order টেবিলে userId নেই
-  // Sales Count = কতগুলো অর্ডারে আমি Sender ছিলাম
+  // Sales Count
   const salesCount = await prisma.order.count({ 
       where: { senderId: user?.id } 
   }) || 0;
   
   // Product Count
-  // medicine টেবিল আপনার স্কিমায় নেই, তাই product টেবিল ব্যবহার করা হচ্ছে
   const medicineCount = await prisma.product.count({ 
-      // where: { userId: user?.id } // প্রোডাক্ট সাধারণত গ্লোবাল হয় বা manufacturerId থাকে, তাই আপাতত সব কাউন্ট করা হচ্ছে
+      // where: { userId: user?.id } 
   }) || 0;
   
   // ফাইন্যান্সিয়াল ডাটা (ডেমো)
