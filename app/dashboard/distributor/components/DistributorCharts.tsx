@@ -26,7 +26,8 @@ export function InventoryValueChart({ data }: { data: any[] }) {
                 <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Value']} />
+            {/* ✅ FIX: value: number এর বদলে value: any ব্যবহার করা হয়েছে যাতে বিল্ড এরর না দেয় */}
+            <Tooltip formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Value']} />
           </PieChart>
         </ResponsiveContainer>
       </div>
