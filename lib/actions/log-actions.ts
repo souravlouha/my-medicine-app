@@ -1,6 +1,6 @@
 'use server'
 
-import { prisma } from "@/lib/prisma"; // ✅ FIX: db এর বদলে prisma ইম্পোর্ট
+import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
 export async function logActivity(action: string, details: string) {
@@ -8,17 +8,19 @@ export async function logActivity(action: string, details: string) {
     const session = await auth();
     const user = session?.user;
 
-    if (!user) return;
+    // ✅ FIX: user.id আছে কিনা সেটাও চেক করা হচ্ছে।
+    // TypeScript জানত না যে user থাকলেই user.id থাকবে, তাই এই চেকটি জরুরি।
+    if (!user || !user.id) return;
 
     await prisma.activityLog.create({
       data: {
         action,
         details,
-        userId: user.id,
+        userId: user.id, // এখন TypeScript নিশ্চিত যে এটি string
       },
     });
   } catch (error) {
     console.error("Failed to log activity:", error);
-    // লগ ফেইল করলে আমরা অ্যাপ ক্র্যাশ করাতে চাই না, তাই সাইলেন্টলি ইগনোর করছি
+    // লগ ফেইল করলে আমরা অ্যাপ ক্র্যাশ করাতে চাই না
   }
 }
