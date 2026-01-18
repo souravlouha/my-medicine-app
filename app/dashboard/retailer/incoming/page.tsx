@@ -16,7 +16,8 @@ export default async function IncomingStockPage() {
     );
   }
 
-  let shipments = [];
+  // ✅ FIX: Explicitly typing shipments array
+  let shipments: any[] = [];
   let errorMsg = "";
 
   try {
@@ -31,9 +32,9 @@ export default async function IncomingStockPage() {
         // আপনার স্কিমাতে যদি 'manufacturer' নামে রিলেশন না থাকে, তবে এটি 'User' বা 'sender' হতে পারে।
         // সেফটির জন্য আমরা এখন শুধু 'shipmentItems' বা 'ShipmentItem' ট্রাই করব।
         
-        manufacturer: true, // যদি এরর দেয়, বুঝবেন এই নামটা ভুল
+        manufacturer: true, // যদি এরর দেয়, বুঝবেন এই নামটা ভুল
         
-        // কমন ভুল: স্কিমাতে নাম 'ShipmentItem' (বড় হাতের) হতে পারে
+        // কমন ভুল: স্কিমাতে নাম 'ShipmentItem' (বড় হাতের) হতে পারে
         // আমরা এখানে 'ShipmentItem' ব্যবহার করছি কারণ টেবিলে নাম সেটাই ছিল
         ShipmentItem: { 
           include: {
@@ -45,7 +46,7 @@ export default async function IncomingStockPage() {
     });
   } catch (error: any) {
     console.error("Prisma Error:", error);
-    // যদি উপরের কোড ফেইল করে, আমরা রিলেশন ছাড়াই ডেটা আনার চেষ্টা করব (ফলব্যাক)
+    // যদি উপরের কোড ফেইল করে, আমরা রিলেশন ছাড়াই ডেটা আনার চেষ্টা করব (ফলব্যাক)
     try {
         shipments = await prisma.shipment.findMany({
             where: { distributorId: user.id, status: "IN_TRANSIT" }
@@ -94,26 +95,26 @@ export default async function IncomingStockPage() {
 
                   {/* Items Table */}
                   <div className="bg-slate-50 rounded-lg overflow-hidden mb-4">
-                     <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-100 text-slate-500">
-                            <tr>
-                                <th className="p-3">Medicine</th>
-                                <th className="p-3">Batch</th>
-                                <th className="p-3 text-right">Qty</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {items.length > 0 ? items.map((item: any) => (
-                                <tr key={item.id} className="border-t border-slate-200">
-                                    <td className="p-3 font-medium">{item.batch?.product?.name || "Unknown"}</td>
-                                    <td className="p-3 font-mono text-xs">{item.batch?.batchNumber || "N/A"}</td>
-                                    <td className="p-3 text-right font-bold">{item.quantity}</td>
-                                </tr>
-                            )) : (
-                                <tr><td colSpan={3} className="p-3 text-center text-slate-400">Items details unavailable</td></tr>
-                            )}
-                        </tbody>
-                     </table>
+                      <table className="w-full text-sm text-left">
+                         <thead className="bg-slate-100 text-slate-500">
+                             <tr>
+                                 <th className="p-3">Medicine</th>
+                                 <th className="p-3">Batch</th>
+                                 <th className="p-3 text-right">Qty</th>
+                             </tr>
+                         </thead>
+                         <tbody>
+                             {items.length > 0 ? items.map((item: any) => (
+                                 <tr key={item.id} className="border-t border-slate-200">
+                                     <td className="p-3 font-medium">{item.batch?.product?.name || "Unknown"}</td>
+                                     <td className="p-3 font-mono text-xs">{item.batch?.batchNumber || "N/A"}</td>
+                                     <td className="p-3 text-right font-bold">{item.quantity}</td>
+                                 </tr>
+                             )) : (
+                                 <tr><td colSpan={3} className="p-3 text-center text-slate-400">Items details unavailable</td></tr>
+                             )}
+                         </tbody>
+                      </table>
                   </div>
 
                   <button className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold hover:bg-slate-800 flex justify-center items-center gap-2">
