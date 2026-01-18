@@ -1,21 +1,24 @@
 'use server'
 
-import { db } from "@/lib/db"; // অথবা prisma ইমপোর্ট করো
+import { prisma } from "@/lib/prisma"; // ✅ FIX: db এর বদলে prisma ইম্পোর্ট
 import { auth } from "@/auth";
 
 export async function logActivity(action: string, details: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id) return;
+    const user = session?.user;
 
-    await db.activityLog.create({
+    if (!user) return;
+
+    await prisma.activityLog.create({
       data: {
-        userId: session.user.id,
         action,
         details,
+        userId: user.id,
       },
     });
   } catch (error) {
-    console.error("Log Error:", error);
+    console.error("Failed to log activity:", error);
+    // লগ ফেইল করলে আমরা অ্যাপ ক্র্যাশ করাতে চাই না, তাই সাইলেন্টলি ইগনোর করছি
   }
 }
