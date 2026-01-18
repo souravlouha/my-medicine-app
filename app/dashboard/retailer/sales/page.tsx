@@ -1,10 +1,7 @@
-import { db } from "@/lib/db"; // prisma এর বদলে db ব্যবহার করুন যদি lib/db থাকে
+import { prisma } from "@/lib/prisma"; // ✅ Fix: db -> prisma
 import { currentUser } from "@/lib/auth"; 
 import { formatCurrency, formatDate } from "@/lib/formatters";
-import { 
-  DollarSign, 
-  Search,
-} from "lucide-react";
+import { DollarSign, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
@@ -13,8 +10,8 @@ export default async function SalesHistoryPage() {
 
   if (!user) return <div>Not authorized</div>;
 
-  // ডাটাবেস থেকে সেলস হিস্ট্রি আনা
-  const sales = await db.order.findMany({
+  // ডাটাবেস থেকে সেলস হিস্ট্রি আনা (Prisma)
+  const sales = await prisma.order.findMany({ // ✅ Fix
     where: { senderId: user.id },
     orderBy: { createdAt: 'desc' },
     include: { items: true }

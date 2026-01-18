@@ -1,21 +1,27 @@
 import { auth } from "@/auth";
-import { db } from "@/lib/db"; // অথবা import { prisma } from "@/lib/prisma";
+import { prisma } from "@/lib/prisma"; // ✅ Fix: db -> prisma
 import { formatCurrency } from "@/lib/formatters";
 import { ActivityLog } from "@/components/dashboard/activity-log";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, CreditCard, TrendingUp, ShoppingCart, Store } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button"; // Button যদি না থাকে, সাধারণ <button> দিও
+import { Package, CreditCard, TrendingUp, Store } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await auth();
   
-  // ১. ড্যাশবোর্ডের জন্য ডাটা ফেচ (ডেমো ডাটা)
+  // ১. ড্যাশবোর্ডের জন্য ডাটা ফেচ
   const user = session?.user;
-  const salesCount = await db.order.count({ where: { userId: user?.id } }) || 0;
-  const medicineCount = await db.medicine.count({ where: { userId: user?.id } }) || 0;
   
-  // ফাইন্যান্সিয়াল ডাটা (তোমার লজিক বসাবে)
+  // ✅ Fix: db.order -> prisma.order
+  const salesCount = await prisma.order.count({ 
+      where: { userId: user?.id } 
+  }) || 0;
+  
+  // ✅ Fix: db.medicine -> prisma.product (medicine টেবিল আপনার স্কিমায় নেই, প্রোডাক্ট হবে)
+  const medicineCount = await prisma.product.count({ 
+      // where: { userId: user?.id } // প্রোডাক্ট সাধারণত গ্লোবাল হয়, তাই শর্ত নাও লাগতে পারে
+  }) || 0;
+  
+  // ফাইন্যান্সিয়াল ডাটা (ডেমো)
   const totalRevenue = 0; 
   const totalProfit = 0;
   const assetValue = 0;
@@ -23,7 +29,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       
-      {/* --- HEADER SECTION START (রিটেইলার ডিটেইলস ফেরত আনা হয়েছে) --- */}
+      {/* --- HEADER SECTION --- */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Dashboard</h2>
@@ -47,10 +53,8 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
-      {/* --- HEADER SECTION END --- */}
 
-
-      {/* --- STATS CARDS (Rupee Symbol Updated) --- */}
+      {/* --- STATS CARDS --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-gradient-to-br from-blue-600 to-blue-700 text-white border-none shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -87,35 +91,32 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Batches</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Products</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{medicineCount}</div>
-            <p className="text-xs text-red-500 font-medium mt-1">2 Low Stock Items</p>
+            <p className="text-xs text-red-500 font-medium mt-1">Inventory Items</p>
           </CardContent>
         </Card>
       </div>
 
       {/* --- MAIN CONTENT GRID --- */}
       <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
-        
-        {/* Chart Area (Takes 2 columns) */}
+        {/* Chart Area */}
         <Card className="col-span-1 lg:col-span-2">
           <CardHeader>
             <CardTitle>Weekly Sales Trend</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
              <div className="h-[350px] flex items-center justify-center text-muted-foreground bg-slate-50 dark:bg-slate-900 rounded-md border border-dashed">
-                {/* এখানে তোমার চার্ট কম্পোনেন্ট বসবে */}
                 <p>No Sales Data Available Chart</p>
              </div>
           </CardContent>
         </Card>
 
-        {/* --- Activity Log (Takes 1 column) --- */}
+        {/* Activity Log */}
         <ActivityLog />
-        
       </div>
     </div>
   );

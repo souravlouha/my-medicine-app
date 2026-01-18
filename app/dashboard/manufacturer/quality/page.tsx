@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AlertTriangle, ShieldCheck } from "lucide-react";
-import { recallBatchAction } from "@/lib/actions/recall-actions"; // এটি আগের স্টেপে বানাতে বলেছিলাম
-import RecallButton from "@/components/RecallButton"; // এটি আমরা নিচে বানাচ্ছি
+import RecallButton from "@/components/RecallButton"; // ✅ পাথ এখন কাজ করবে
 
 export default async function QualityControlPage() {
   // ম্যানুফ্যাকচারারের সব ব্যাচ আনা
