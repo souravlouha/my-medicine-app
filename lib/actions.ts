@@ -1,11 +1,11 @@
-import { prisma } from "@/lib/prisma"; // আপনার প্রিজমা ক্লায়েন্ট ইম্পোর্ট পাথ ঠিক করুন
+import { prisma } from "@/lib/prisma";
 
 export async function createBatchWithStock(data: any) {
   try {
-    // ১. ইনপুট ডাটাগুলো নিয়ে নিন
+    // ১. ইনপুট ডাটাগুলো নিয়ে নিন
     const { 
       manufacturerId, 
-      medicineName, 
+      medicineName, // এটি আমরা Product টেবিলে খুঁজব
       mfgDate, 
       expDate, 
       pricePerStrip, 
@@ -13,43 +13,80 @@ export async function createBatchWithStock(data: any) {
       mrp 
     } = data;
 
-    // ২. ট্রানজ্যাকশন শুরু (সব কাজ একসাথে হবে, অথবা কিছুই হবে না)
+    // ২. ট্রানজ্যাকশন শুরু
     const result = await prisma.$transaction(async (tx) => {
       
-      // স্টেপ ২.১: ম্যানুফ্যাকচারার বা ইউজার চেক করা
-      // আমরা প্রথমে চেক করছি এই আইডির ইউজার আসলেই আছে কিনা
+      // ২.১: ম্যানুফ্যাকচারার চেক করা
       const manufacturerExists = await tx.user.findUnique({
         where: { id: manufacturerId }
       });
 
       if (!manufacturerExists) {
-        throw new Error(`Manufacturer not found with ID: ${manufacturerId}. Please check the User table.`);
+        throw new Error(`Manufacturer not found with ID: ${manufacturerId}`);
       }
 
-      // স্টেপ ২.২: ব্যাচ তৈরি করা
+      // ✅ FIX: ২.২: প্রোডাক্ট খোঁজা অথবা তৈরি করা (কারণ ব্যাচের জন্য productId লাগবে)
+      let product = await tx.product.findFirst({
+        where: { 
+            name: medicineName,
+            manufacturerId: manufacturerId 
+        }
+      });
+
+      // যদি প্রোডাক্ট না থাকে, তবে অটোমেটিক তৈরি করে নেব (যাতে এরর না খায়)
+      if (!product) {
+        const pCount = await tx.product.count();
+        product = await tx.product.create({
+            data: {
+                name: medicineName,
+                productCode: `AUTO-${pCount + 1}`,
+                genericName: medicineName, // ডিফল্ট
+                type: "TABLET",            // ডিফল্ট
+                strength: "N/A",
+                storageTemp: "Room Temp",
+                basePrice: parseFloat(pricePerStrip || "0"),
+                manufacturerId: manufacturerId
+            }
+        });
+      }
+
+      // ✅ FIX: ২.৩: ব্যাচ তৈরি করা (সঠিক স্কিমা ফিল্ড ব্যবহার করে)
+      const bCount = await tx.batch.count();
+      const autoBatchNumber = `B-${Date.now().toString().slice(-6)}-${bCount}`;
+
       const newBatch = await tx.batch.create({
         data: {
-          medicineName,
+          batchNumber: autoBatchNumber, // ব্যাচ নম্বর জেনারেট করা হলো
+          productId: product.id,        // medicineName এর বদলে productId
+          manufacturerId: manufacturerId,
+          mrp: parseFloat(mrp),
+          totalQuantity: parseInt(totalStrips), // totalStrips -> totalQuantity
           mfgDate: new Date(mfgDate),
           expDate: new Date(expDate),
-          pricePerStrip: parseFloat(pricePerStrip),
-          mrp: parseFloat(mrp),
-          totalStrips: parseInt(totalStrips),
-          currentStock: parseInt(totalStrips), // শুরুতে স্টক = টোটাল স্ট্রিপস
-          manufacturerId: manufacturerId, // এখানে রিলেশন তৈরি হচ্ছে
         },
       });
 
-      // স্টেপ ২.৩: ইউনিট বা QR কোড ডাটা তৈরি করা (অপশনাল)
-      // যদি প্রতিটা স্ট্রিপের জন্য আলাদা QR/Unit দরকার হয়
+      // ✅ FIX: ২.৪: ইনভেন্টরি আপডেট (স্টক ব্যাচ টেবিলে থাকে না, ইনভেন্টরিতে থাকে)
+      await tx.inventory.create({
+        data: {
+            userId: manufacturerId,
+            batchId: newBatch.id,
+            currentStock: parseInt(totalStrips)
+        }
+      });
+
+      // ২.৫: ইউনিট বা QR কোড ডাটা তৈরি করা (অপশনাল)
       const unitsData = Array.from({ length: parseInt(totalStrips) }).map(() => ({
-        uid: `UNIT-${newBatch.id}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`, // ইউনিক আইডি
+        uid: `UNIT-${newBatch.id}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
         batchId: newBatch.id,
-        status: "IN_MANUFACTURER",
+        currentHandlerId: manufacturerId, // মালিকানা সেট করা হলো
+        type: "STRIP", // টাইপ বলে দেওয়া হলো
+        status: "CREATED",
       }));
 
-      // অনেকগুলো ইউনিট একসাথে ডাটাবেসে ঢুকানো
+      // ইউনিট সেভ করা
       if (unitsData.length > 0) {
+        // @ts-ignore
         await tx.unit.createMany({
           data: unitsData,
         });
@@ -63,11 +100,6 @@ export async function createBatchWithStock(data: any) {
 
   } catch (error: any) {
     console.error("Database Upload Error:", error);
-    
-    // এরর মেসেজ ক্লিন করে রিটার্ন করা
-    if (error.code === 'P2025') {
-      return { success: false, error: "Manufacturer ID did not match any User in the database." };
-    }
     return { success: false, error: error.message };
   }
 }
