@@ -9,7 +9,7 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'
 
 export default function RetailerCharts({ inventory }: { inventory: any[] }) {
   
-  // ১. ডাটা প্রসেসিং: ক্যাটাগরি অনুযায়ী স্টক (Pie Chart)
+  // ১. ডাটা প্রসেসিং: ক্যাটাগরি অনুযায়ী স্টক (Pie Chart)
   const stockByType: Record<string, number> = {};
   inventory.forEach(item => {
     const type = item.batch.product.type;
@@ -17,7 +17,7 @@ export default function RetailerCharts({ inventory }: { inventory: any[] }) {
   });
   const pieData = Object.entries(stockByType).map(([name, value]) => ({ name, value }));
 
-  // ২. ডাটা প্রসেসিং: টপ ৫ ভ্যালুয়েবল প্রোডাক্ট (Bar Chart)
+  // ২. ডাটা প্রসেসিং: টপ ৫ ভ্যালুয়েবল প্রোডাক্ট (Bar Chart)
   const valueData = inventory
     .map(item => ({
       name: item.batch.product.name.substring(0, 10) + "..", // নাম ছোট করা
@@ -66,7 +66,8 @@ export default function RetailerCharts({ inventory }: { inventory: any[] }) {
                   <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                   <XAxis type="number" hide />
                   <YAxis dataKey="name" type="category" width={80} tick={{fontSize: 10, fontWeight: 'bold'}} />
-                  <Tooltip formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Total Value']} />
+                  {/* ✅ FIX: value: any ব্যবহার করা হয়েছে এবং Number() দিয়ে সেফ করা হয়েছে */}
+                  <Tooltip formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Total Value']} />
                   <Bar dataKey="value" fill="#8B5CF6" radius={[0, 4, 4, 0]} barSize={20} />
                </BarChart>
             </ResponsiveContainer>
