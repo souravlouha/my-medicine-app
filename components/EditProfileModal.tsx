@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { updateFullProfileAction } from "@/app/_dashboard_old/actions"; // সঠিক পাথ চেক করো
+// ✅ FIX: সঠিক পাথ থেকে অ্যাকশন ইম্পোর্ট করা হলো
+import { updateFullProfileAction } from "@/lib/actions/profile-actions"; 
 
 export default function EditProfileModal({ user, onClose }: { user: any, onClose: () => void }) {
   const [loading, setLoading] = useState(false);
@@ -18,14 +19,15 @@ export default function EditProfileModal({ user, onClose }: { user: any, onClose
       fullAddress: formData.get("fullAddress"),
     };
 
+    // সার্ভার অ্যাকশন কল করা
     const res = await updateFullProfileAction(user.id, data);
     
     if (res.success) {
-      alert("✅ প্রোফাইল সফলভাবে আপডেট হয়েছে!");
+      alert("✅ প্রোফাইল সফলভাবে আপডেট হয়েছে!");
       onClose();
       window.location.reload(); // নতুন ডেটা দেখানোর জন্য পেজ রিফ্রেশ হবে
     } else {
-      alert("❌ সমস্যা হয়েছে: " + res.message);
+      alert("❌ সমস্যা হয়েছে: " + res.message);
     }
     setLoading(false);
   }
@@ -48,18 +50,19 @@ export default function EditProfileModal({ user, onClose }: { user: any, onClose
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Drug License No</label>
-            <input name="licenseNo" defaultValue={user.licenseNo} type="text" className="w-full border-gray-100 border p-4 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold" placeholder="DL-12345" />
+            {/* user.licenseNumber ব্যবহার করা হয়েছে কারণ ডাটাবেসে এই নামেই আছে */}
+            <input name="licenseNo" defaultValue={user.licenseNumber || user.licenseNo} type="text" className="w-full border-gray-100 border p-4 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold" placeholder="DL-12345" />
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">GST Identification No</label>
-            <input name="gstNo" defaultValue={user.gstNo} type="text" className="w-full border-gray-100 border p-4 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold" placeholder="22AAAAA0000A1Z5" />
+            <input name="gstNo" defaultValue={user.gstNumber || user.gstNo} type="text" className="w-full border-gray-100 border p-4 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none font-bold" placeholder="22AAAAA0000A1Z5" />
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Full Factory Address</label>
-            <textarea name="fullAddress" defaultValue={user.fullAddress || user.location} className="w-full border-gray-100 border p-4 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none h-24 font-bold" placeholder="Street, City, State..."></textarea>
+            {/* user.address ব্যবহার করা হয়েছে */}
+            <textarea name="fullAddress" defaultValue={user.address || user.fullAddress || user.location} className="w-full border-gray-100 border p-4 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none h-24 font-bold" placeholder="Street, City, State..."></textarea>
           </div>
 
-          {/* 🔥 এটা হলো তোমার সেভ বাটন */}
           <button 
             type="submit"
             disabled={loading} 
