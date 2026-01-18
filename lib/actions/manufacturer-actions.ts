@@ -314,11 +314,12 @@ export async function rejectOrderAction(formData: FormData) {
     try {
       await prisma.order.update({
         where: { id: orderId },
-        data: { status: "REJECTED" }
+        // ✅ FIX: "REJECTED" এর বদলে "CANCELLED" ব্যবহার করা হলো (কারণ স্কিমায় REJECTED নেই)
+        data: { status: "CANCELLED" }
       });
   
       revalidatePath("/dashboard/manufacturer/orders");
-      return { success: true, message: "Order Rejected" };
+      return { success: true, message: "Order Rejected (Cancelled)" };
     } catch (error) {
       console.error("Reject Error:", error);
       return { success: false, error: "Failed to reject order" };
