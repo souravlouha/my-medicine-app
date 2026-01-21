@@ -2,121 +2,69 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic"; 
+import dynamic from "next/dynamic";
 import { ArrowLeft, MapPin, Navigation, Loader2, Crosshair } from "lucide-react";
 
-// ⚠️ ম্যাপ দেখানোর জন্য এই লাইনটি খুব জরুরি (CSS Import)
-import "leaflet/dist/leaflet.css"; 
-
-// --- 1. Dynamic Map Imports ---
-// Next.js এ ম্যাপ লোড করতে window অবজেক্ট লাগে, তাই ssr: false দিতে হয়
-const MapContainer = dynamic(() => import("react-leaflet").then(mod => mod.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLayer), { ssr: false });
-const Marker = dynamic(() => import("react-leaflet").then(mod => mod.Marker), { ssr: false });
-const Popup = dynamic(() => import("react-leaflet").then(mod => mod.Popup), { ssr: false });
-
-// --- 2. Map Re-center Component (ম্যাপ ফিক্স করার জন্য এটি জরুরি) ---
-// এটি ম্যাপকে জোর করে আপনার নতুন লোকেশনে নিয়ে যাবে
-const RecenterAutomatically = ({ lat, lng }: { lat: number; lng: number }) => {
-  const [map, setMap] = useState<any>(null);
-  
-  useEffect(() => {
-    // ম্যাপ অবজেক্ট পাওয়ার চেষ্টা
-    const getMap = async () => {
-       try {
-         const { useMap } = await import("react-leaflet");
-         // আমরা হুক ব্যবহার না করে সরাসরি props বা key দিয়েও করতে পারি, 
-         // তবে নিচের key টেকনিকটি সবচেয়ে সহজ।
-       } catch (e) {}
-    };
-    getMap();
-  }, []);
-
-  return null; 
-};
+// ⚠️ ম্যাপ কম্পোনেন্টটি ডাইনামিক ইম্পোর্ট করা হচ্ছে (SSR বন্ধ রাখার জন্য)
+const PharmacyMap = dynamic(() => import("@/components/PharmacyMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full flex items-center justify-center bg-slate-200">
+      <Loader2 className="animate-spin text-blue-600" size={40} />
+      <span className="ml-2 text-slate-600">মানচিত্র লোড হচ্ছে...</span>
+    </div>
+  ),
+});
 
 export default function PharmacyLocator() {
-  // ডিফল্ট: কলকাতা (যদি জিপিএস কাজ না করে)
+  // ডিফল্ট: কলকাতা
   const defaultLocation = { lat: 22.5726, lng: 88.3639 };
-  
   const [location, setLocation] = useState(defaultLocation);
-  const [mapKey, setMapKey] = useState(0); // এটি ম্যাপ রিফ্রেশ করতে সাহায্য করবে
   const [hasLocation, setHasLocation] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedPharmacy, setSelectedPharmacy] = useState<number | null>(null);
-  const [pharmacies, setPharmacies] = useState<any[]>([]);
-  const [LeafletIcons, setLeafletIcons] = useState<any>(null); 
-
-  // --- 3. আইকন সেটআপ ---
-  useEffect(() => {
-    (async () => {
-      if (typeof window !== 'undefined') {
-        const L = (await import('leaflet')).default;
-        
-        const personIcon = new L.Icon({
-          iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png",
-          iconSize: [40, 40],
-          iconAnchor: [20, 40],
-          popupAnchor: [0, -40]
-        });
-
-        const pharmacyIcon = new L.Icon({
-          iconUrl: "https://cdn-icons-png.flaticon.com/512/169/169869.png",
-          iconSize: [35, 35],
-          iconAnchor: [17, 35],
-          popupAnchor: [0, -35]
-        });
-
-        setLeafletIcons({ person: personIcon, pharmacy: pharmacyIcon });
-      }
-    })();
-  }, []);
-
-  // --- 4. দোকান জেনারেটর (আপনার ফালাকাটা লোকেশনের আশেপাশে) ---
+  
+  // ডামি ডাটা জেনারেটর
   const generatePharmacies = (lat: number, lng: number) => {
     return [
-      { id: 1, name: "Falakata Medico", lat: lat + 0.0015, lng: lng + 0.0010, distance: "200m", address: "Main Road, Near Chowpathi", open: true },
-      { id: 2, name: "Jibon Deep Pharmacy", lat: lat - 0.0020, lng: lng - 0.0015, distance: "500m", address: "College Para", open: true },
-      { id: 3, name: "Arogya Niketan", lat: lat + 0.0030, lng: lng - 0.0020, distance: "800m", address: "Station Road", open: false },
-      { id: 4, name: "Sanjivani Store", lat: lat - 0.0010, lng: lng + 0.0040, distance: "1.2 km", address: "Hospital Gate", open: true },
+      { id: 1, name: "City Pharmacy", lat: lat + 0.0015, lng: lng + 0.0010, distance: "200m", address: "Main Road", open: true },
+      { id: 2, name: "Jibon Deep", lat: lat - 0.0020, lng: lng - 0.0015, distance: "500m", address: "College Para", open: true },
+      { id: 3, name: "Health Care", lat: lat + 0.0030, lng: lng - 0.0020, distance: "800m", address: "Station Road", open: false },
+      { id: 4, name: "Sanjivani", lat: lat - 0.0010, lng: lng + 0.0040, distance: "1.2 km", address: "Hospital Gate", open: true },
     ];
   };
 
-  // --- 5. জিপিএস লোকেশন বের করার ফাংশন ---
+  const [pharmacies, setPharmacies] = useState<any[]>([]);
+
+  // শুরুতে ডিফল্ট লোকেশনের দোকান দেখাবে
+  useEffect(() => {
+    setPharmacies(generatePharmacies(defaultLocation.lat, defaultLocation.lng));
+  }, []);
+
   const handleGetLocation = () => {
     setLoading(true);
-    
     if (!navigator.geolocation) {
-      alert("Browser location not supported");
+      alert("আপনার ব্রাউজারে লোকেশন সাপোর্ট নেই।");
       setLoading(false);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        // ✅ ফালাকাটার লোকেশন এখানে সেট হবে
         const { latitude, longitude } = position.coords;
         setLocation({ lat: latitude, lng: longitude });
-        setPharmacies(generatePharmacies(latitude, longitude)); // নতুন লোকেশনে দোকান বসাবে
+        setPharmacies(generatePharmacies(latitude, longitude));
         setHasLocation(true);
-        setMapKey(prev => prev + 1); // ⚠️ এটি ম্যাপকে ফোর্স করবে নতুন লোকেশনে যেতে
         setLoading(false);
       },
       (error) => {
-        console.error("GPS Error: ", error);
-        alert("Location blocked! Please allow location access from browser settings (top left lock icon).");
+        console.error(error);
+        alert("লোকেশন পাওয়া যাচ্ছে না। দয়া করে ব্রাউজারের লোকেশন পারমিশন চেক করুন।");
         setLoading(false);
       },
-      { enableHighAccuracy: true } // ভালো রেজাল্টের জন্য
+      { enableHighAccuracy: true }
     );
   };
-
-  // প্রথমে ডিফল্ট দোকান লোড হবে
-  useEffect(() => {
-    setPharmacies(generatePharmacies(defaultLocation.lat, defaultLocation.lng));
-  }, []);
-
-  if (!LeafletIcons) return <div className="h-screen w-full flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-blue-600"/></div>;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
@@ -127,108 +75,64 @@ export default function PharmacyLocator() {
             <ArrowLeft size={20} className="text-slate-700"/>
         </Link>
         <div className="flex-1">
-            <h1 className="text-lg font-bold text-slate-900">Nearby Stores</h1>
+            <h1 className="text-lg font-bold text-slate-900">ফার্মেসি খুঁজুন</h1>
             <p className="text-xs text-slate-500 flex items-center gap-1">
                 <MapPin size={10} /> 
-                {hasLocation ? "Your Location (Found)" : "Default View (Kolkata)"}
+                {hasLocation ? "আপনার লোকেশন" : "ডিফল্ট ভিউ (কলকাতা)"}
             </p>
         </div>
-        {/* GPS Button */}
         <button 
           onClick={handleGetLocation}
-          className="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 active:scale-90 transition animate-bounce-slow"
+          className={`p-3 rounded-full shadow-lg transition ${hasLocation ? 'bg-green-600 text-white' : 'bg-blue-600 text-white animate-bounce'}`}
         >
           {loading ? <Loader2 size={20} className="animate-spin"/> : <Crosshair size={20}/>}
         </button>
       </div>
 
-      {/* --- Map View (FIXED) --- */}
+      {/* --- Map Area --- */}
       <div className="flex-1 relative w-full h-[55vh] z-0 bg-slate-200">
-        <MapContainer 
-            key={mapKey} // ⚠️ KEY পরিবর্তন হলে ম্যাপ রিফ্রেশ হয় এবং নতুন লোকেশনে যায়
-            center={[location.lat, location.lng]} 
-            zoom={15} 
-            scrollWheelZoom={true} 
-            style={{ height: "100%", width: "100%", zIndex: 0 }} 
-        >
-            <TileLayer
-                attribution='&copy; OpenStreetMap'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            
-            {/* User Marker */}
-            {hasLocation && (
-              <Marker position={[location.lat, location.lng]} icon={LeafletIcons.person}>
-                  <Popup>You are here!</Popup>
-              </Marker>
-            )}
-
-            {/* Pharmacy Markers */}
-            {pharmacies.map((pharmacy) => (
-                <Marker 
-                    key={pharmacy.id} 
-                    position={[pharmacy.lat, pharmacy.lng]} 
-                    icon={LeafletIcons.pharmacy}
-                    eventHandlers={{
-                        click: () => setSelectedPharmacy(pharmacy.id),
-                    }}
-                >
-                  <Popup>{pharmacy.name}</Popup>
-                </Marker>
-            ))}
-        </MapContainer>
-
-        {/* GPS Prompt if not enabled */}
-        {!hasLocation && !loading && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[400] bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-red-100 flex items-center gap-2 w-max">
-             <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-             <p className="text-xs font-bold text-slate-700">Tap GPS button to locate Falakata</p>
-          </div>
-        )}
+         {/* এখানে আমরা আলাদা করা ম্যাপ কম্পোনেন্ট লোড করছি */}
+         <PharmacyMap 
+            location={location} 
+            pharmacies={pharmacies} 
+            onSelect={(id: number) => setSelectedPharmacy(id)}
+         />
       </div>
 
-      {/* --- Bottom List View --- */}
-      <div className="bg-white rounded-t-[2rem] shadow-[0_-5px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 p-6 pb-10 min-h-[45vh] max-h-[50vh] overflow-y-auto">
+      {/* --- Pharmacy List --- */}
+      <div className="bg-white rounded-t-[2rem] shadow-[0_-5px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 p-6 pb-20 min-h-[45vh] overflow-y-auto">
          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sticky top-0"></div>
-         <h2 className="text-lg font-bold text-slate-900 mb-4">Pharmacies List</h2>
+         <h2 className="text-lg font-bold text-slate-900 mb-4">কাছাকাছি ফার্মেসি</h2>
          
          <div className="space-y-4">
             {pharmacies.map((item) => (
                 <div 
                     key={item.id} 
-                    className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer ${selectedPharmacy === item.id ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-100 bg-white hover:border-slate-300'}`}
+                    className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer ${selectedPharmacy === item.id ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white'}`}
                     onClick={() => {
                       setSelectedPharmacy(item.id);
-                      setLocation({ lat: item.lat, lng: item.lng }); 
-                      setMapKey(prev => prev + 1); // Click list item to fly map
+                      setLocation({ lat: item.lat, lng: item.lng });
                     }}
                 >
                     <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-full ${selectedPharmacy === item.id ? 'bg-blue-200 text-blue-700' : 'bg-blue-50 text-blue-600'}`}>
+                        <div className="p-3 bg-blue-50 text-blue-600 rounded-full">
                             <MapPin size={20}/>
                         </div>
                         <div>
                             <h3 className="font-bold text-slate-900 text-sm">{item.name}</h3>
                             <p className="text-xs text-slate-500 mb-1">{item.address}</p>
-                            <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${item.open ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                    {item.open ? 'Open' : 'Closed'}
-                                </span>
-                                <span className="text-xs text-slate-400 font-medium">• {item.distance}</span>
-                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${item.open ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                {item.open ? 'Open' : 'Closed'}
+                            </span>
                         </div>
                     </div>
-                    
-                    <div className="flex flex-col gap-2">
-                        <button className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-blue-600 hover:text-white transition shadow-sm">
-                            <Navigation size={16}/>
-                        </button>
-                    </div>
+                    <button className="p-2 bg-slate-100 rounded-full text-slate-600">
+                        <Navigation size={16}/>
+                    </button>
                 </div>
             ))}
          </div>
       </div>
-
     </div>
   );
 }
