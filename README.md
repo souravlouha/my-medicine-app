@@ -11,6 +11,9 @@ my-medicine-app
 │  │  └─ track
 │  │     └─ [id]
 │  │        └─ page.tsx
+│  ├─ api
+│  ├─ contact
+│  │  └─ page.tsx
 │  ├─ dashboard
 │  │  ├─ distributor
 │  │  │  ├─ components
@@ -98,14 +101,20 @@ my-medicine-app
 │  │  └─ track
 │  │     ├─ page.tsx
 │  │     └─ TrackClient.tsx
+│  ├─ docs
+│  │  └─ page.tsx
 │  ├─ favicon.ico
+│  ├─ features
+│  │  └─ pharmacy-locator
+│  │     ├─ MapUpdater.js
+│  │     └─ page.tsx
 │  ├─ globals.css
 │  ├─ layout.tsx
 │  ├─ page.tsx
+│  ├─ track
+│  │  └─ page.tsx
 │  └─ verify
-│     ├─ [batchId]
-│     │  └─ page.tsx
-│     └─ [id]
+│     └─ [batchId]
 │        └─ page.tsx
 ├─ auth.ts
 ├─ components
@@ -117,6 +126,7 @@ my-medicine-app
 │  │  └─ Sidebar.tsx
 │  ├─ EditProfileModal.tsx
 │  ├─ ManufacturerHeader.tsx
+│  ├─ RecallButton.tsx
 │  ├─ RetailerCharts.tsx
 │  ├─ tracking
 │  │  └─ TrackingResultViewer.tsx
@@ -133,6 +143,7 @@ my-medicine-app
 │  │  ├─ log-actions.ts
 │  │  ├─ manufacturer-actions.ts
 │  │  ├─ pos-actions.ts
+│  │  ├─ profile-actions.ts
 │  │  ├─ recall-actions.ts
 │  │  ├─ retailer-actions.ts
 │  │  ├─ sales-actions.ts
@@ -145,6 +156,7 @@ my-medicine-app
 │  ├─ prisma.ts
 │  └─ utils.ts
 ├─ middleware.ts
+├─ New folder
 ├─ next.config.ts
 ├─ package-lock.json
 ├─ package.json
@@ -158,9 +170,18 @@ my-medicine-app
 │  │  └─ migration_lock.toml
 │  └─ schema.prisma
 ├─ public
+│  ├─ bg.jpg
 │  ├─ file.svg
 │  ├─ globe.svg
+│  ├─ hero.png
 │  ├─ next.svg
+│  ├─ photo-1562243061-204550d8a2c9.jpg
+│  ├─ premium_photo-1664373622064-3847709d4cf9.jpg
+│  ├─ premium_photo-1668605108427-695ef1c16256.jpg
+│  ├─ premium_photo-1671411374326-65e8b381a6d4.jpg
+│  ├─ premium_photo-1674572257954-a1a9265ce1a9.jpg
+│  ├─ slide2.jpg
+│  ├─ slide3.jpg
 │  ├─ vercel.svg
 │  └─ window.svg
 └─ tsconfig.json

@@ -14,24 +14,30 @@ export async function createProductAction(formData: FormData) {
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    const count = await prisma.product.count({ where: { manufacturerId: userId } });
-    const autoCode = `MED-${(1000 + count + 1).toString()}`;
+    // ✅ FIX: ইউনিক কোড জেনারেট করার জন্য টাইমস্ট্যাম্প ব্যবহার করা হলো
+    // এতে কখনো ডুপ্লিকেট কোড তৈরি হবে না (MED-XXXXXX)
+    const timestamp = Date.now().toString().slice(-6);
+    const randomNum = Math.floor(Math.random() * 99).toString().padStart(2, '0');
+    const autoCode = `MED-${timestamp}${randomNum}`;
 
     await prisma.product.create({
       data: {
         productCode: autoCode,
         name: formData.get("name") as string,
         genericName: formData.get("genericName") as string,
-        type: formData.get("type") as any,
+        // Enum টাইপ ঠিক রাখার জন্য UpperCase করা ভালো
+        type: (formData.get("type") as string).toUpperCase() as any,
         strength: formData.get("strength") as string,
         storageTemp: formData.get("storageTemp") as string,
         basePrice: parseFloat(formData.get("basePrice") as string) || 0,
         manufacturerId: userId
       }
     });
+    
     revalidatePath("/dashboard/manufacturer/catalog");
     return { success: true, message: "✅ Product added with Code: " + autoCode };
   } catch (error) {
+    console.error("Create Product Error:", error);
     return { success: false, error: "Failed to create product" };
   }
 }
@@ -260,14 +266,14 @@ export async function shipApprovedOrderAction(formData: FormData) {
 
         // স্টক আপডেট
         await tx.inventory.update({
-            where: { id: inventoryRecord.id },
-            data: { currentStock: { decrement: item.quantity } }
+          where: { id: inventoryRecord.id },
+          data: { currentStock: { decrement: item.quantity } }
         });
 
         shipmentItemsData.push({
-            batchId: inventoryRecord.batchId,
-            quantity: item.quantity,
-            price: item.price
+          batchId: inventoryRecord.batchId,
+          quantity: item.quantity,
+          price: item.price
         });
         shipmentTotal += (item.quantity * item.price);
       }
@@ -275,12 +281,12 @@ export async function shipApprovedOrderAction(formData: FormData) {
       // C. শিপমেন্ট তৈরি (Invoice Number সহ)
       await tx.shipment.create({
         data: {
-            shipmentId: shipmentId, // ট্র্যাকিং আইডি
-            manufacturerId: order.receiverId,
-            distributorId: order.senderId,
-            totalAmount: shipmentTotal,
-            status: "IN_TRANSIT",
-            items: { create: shipmentItemsData }
+          shipmentId: shipmentId, // ট্র্যাকিং আইডি
+          manufacturerId: order.receiverId,
+          distributorId: order.senderId,
+          totalAmount: shipmentTotal,
+          status: "IN_TRANSIT",
+          items: { create: shipmentItemsData }
         }
       });
 
@@ -288,7 +294,7 @@ export async function shipApprovedOrderAction(formData: FormData) {
       await tx.order.update({
         where: { id: orderId },
         data: { 
-            status: "SHIPPED",
+          status: "SHIPPED",
         }
       });
     }, {
