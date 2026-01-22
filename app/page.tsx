@@ -9,7 +9,8 @@ import {
   Zap, ArrowUpRight, Building2, Quote, ChevronRight,
   Truck, Box, BarChart3, Globe, Lock, FileText, Database, Menu,
   MoreHorizontal, Phone, History, Home, TrendingUp, TrendingDown,
-  Loader2, Server, Layers, Award, Star
+  Loader2, Server, Layers, Award, Star, HeartPulse, Stethoscope, 
+  ShieldAlert, Fingerprint, Globe2, Leaf, Factory, Lightbulb, Siren
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -29,11 +30,30 @@ export default function LandingPage() {
     fake: 127
   });
 
+  // --- 💡 HEALTH TIPS ROTATION STATE ---
+  const [currentTip, setCurrentTip] = useState(0);
+  const healthTips = [
+    "Always check the seal integrity before purchase.",
+    "Verify the expiry date on every medicine strip.",
+    "Store medicines in a cool, dry place away from sunlight.",
+    "If the packaging looks faded, do not buy it.",
+    "Scan the QR code to ensure the medicine is genuine."
+  ];
+
   useEffect(() => {
     setMounted(true);
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+
+    // 🔄 Health Tip Rotator (Every 4 seconds)
+    const tipInterval = setInterval(() => {
+        setCurrentTip((prev) => (prev + 1) % healthTips.length);
+    }, 4000);
+
+    return () => {
+        window.removeEventListener("scroll", handleScroll);
+        clearInterval(tipInterval);
+    };
   }, []);
 
   const handleFeatureClick = (feature: string) => {
@@ -96,32 +116,50 @@ export default function LandingPage() {
     "“Technology saves lives.” — Digital Health Alliance"
   ];
 
-  // ✅ New Testimonials Data (আলাদা আলাদা নাম)
+  // ✅ TESTIMONIALS (Realistic & Detailed)
   const testimonials = [
     {
       id: 1,
       name: "Rahul Sharma",
-      role: "Director of Logistics, Cipla",
-      quote: "MedTrace has completely revolutionized our supply chain visibility. We can now track every unit with 100% accuracy."
+      role: "Logistics Lead, Cipla",
+      quote: "Before integrating MedTrace, we struggled with significant blind spots in our supply chain, especially during last-mile delivery. Now, we have granular visibility that allows us to track every single strip with 100% accuracy. It has completely transformed our operations efficiency."
     },
     {
       id: 2,
-      name: "Priya Desai",
-      role: "Head of Quality, Sun Pharma",
-      quote: "Counterfeit drugs were a massive headache for us. MedTrace's blockchain ledger eliminated that risk overnight."
+      name: "Dr. Elena R.",
+      role: "Quality Head, Novartis",
+      quote: "The threat of counterfeit drugs entering our supply chain was keeping me up at night. Since deploying MedTrace's blockchain ledger, we have an immutable record of every product journey. We have seen a complete elimination of verification disputes in just six months."
     },
     {
       id: 3,
-      name: "Vikram Malhotra",
-      role: "Supply Chain Lead, Dr. Reddy's",
-      quote: "Seamless integration with our existing SAP systems. The real-time analytics dashboard is a game-changer."
+      name: "Vikram M.",
+      role: "S. Chain, Dr. Reddy's",
+      quote: "What impressed me most was the speed of integration. We connected MedTrace with our complex SAP ERP environment in less than two weeks without any downtime. The real-time analytics dashboard gives us predictive insights that we never had before."
+    },
+    {
+      id: 4,
+      name: "Sarah Johnson",
+      role: "CTO, Global Health",
+      quote: "Scalability was our biggest concern, but MedTrace proved its robustness immediately. We expanded our tracking to over 50 countries in a single quarter. The API is incredibly well-documented, and the support team is proactive and knowledgeable."
+    },
+    {
+      id: 5,
+      name: "Ahmed Khan",
+      role: "CEO, Beximco",
+      quote: "For cross-border pharmaceutical shipments, compliance is everything. MedTrace automated our entire regulatory reporting process for FDA and EU FMD standards. It saves us thousands of man-hours every year and ensures we are always audit-ready."
+    },
+    {
+      id: 6,
+      name: "Wei Zhang",
+      role: "Compliance, Sinopharm",
+      quote: "The combination of IoT monitoring and blockchain verification is powerful. We can now guarantee not just the authenticity but also the quality of our temperature-sensitive vaccines from the factory floor to the patient's hand."
     }
   ];
 
   return (
     <div className="min-h-screen font-sans text-slate-900 selection:bg-blue-600 selection:text-white">
       
-      {/* CSS for Scrolling */}
+      {/* CSS for Scrolling & Animations */}
       <style jsx>{`
         @keyframes scroll { 
           0% { transform: translateX(0); } 
@@ -131,9 +169,23 @@ export default function LandingPage() {
           0% { transform: translateX(-50%); } 
           100% { transform: translateX(0); } 
         }
-        .animate-scroll { display: flex; width: max-content; animation: scroll 25s linear infinite; }
-        .animate-scroll-reverse { display: flex; width: max-content; animation: scroll-reverse 25s linear infinite; }
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+        .animate-scroll { display: flex; width: max-content; animation: scroll 80s linear infinite; }
+        .animate-scroll-reverse { display: flex; width: max-content; animation: scroll-reverse 30s linear infinite; }
+        .animate-float { animation: float 6s ease-in-out infinite; }
         
+        .hover\:pause:hover { animation-play-state: paused; }
+        
+        /* Fade animation for tip text */
+        @keyframes fade-in {
+            0% { opacity: 0; transform: translateY(5px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-text { animation: fade-in 0.5s ease-out forwards; }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
@@ -144,8 +196,8 @@ export default function LandingPage() {
       <div className="md:hidden bg-[#F8FAFC] min-h-screen pb-32 relative overflow-hidden">
          
          {/* -- Background Gradient -- */}
-         <div className="absolute top-0 left-0 w-full h-[320px] bg-gradient-to-b from-blue-700 to-[#F8FAFC] rounded-b-[3rem] z-0"></div>
-
+         <div className="absolute top-0 left-0 w-full h-[350px] bg-gradient-to-b from-blue-700 via-indigo-600 to-[#F8FAFC] rounded-b-[3rem] z-0 shadow-xl"></div>
+         
          {/* -- Top Floating Header -- */}
          <div className="fixed top-4 left-0 right-0 z-50 px-4">
             <div className="bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-white/50 p-2.5 flex justify-between items-center px-5">
@@ -166,12 +218,12 @@ export default function LandingPage() {
          </div>
 
          {/* -- Mobile Hero Content -- */}
-         <div className="relative z-10 px-6 pt-28 pb-6 text-white">
+         <div className="relative z-10 px-6 pt-28 pb-4 text-white">
             <div className="flex justify-between items-end mb-6">
                 <div>
                     <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Stay Safe</p>
                     <h1 className="text-3xl font-black leading-tight">
-                    Verify Medicine <br/> Instantly
+                       Verify Medicine <br/> Instantly
                     </h1>
                 </div>
             </div>
@@ -181,24 +233,36 @@ export default function LandingPage() {
                <div className="bg-white text-slate-900 p-6 rounded-[2rem] shadow-2xl relative overflow-hidden group active:scale-[0.98] transition duration-200">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full blur-[40px] -translate-y-1/2 translate-x-1/2"></div>
                   <div className="relative z-10 flex items-center justify-between">
-                     <div>
-                        <div className="flex items-center gap-2 mb-2">
+                      <div>
+                         <div className="flex items-center gap-2 mb-2">
                             <div className="bg-blue-600 text-white p-2 rounded-xl"><QrCode size={24}/></div>
                             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-wider">AI Powered</span>
-                        </div>
-                        <p className="font-bold text-xl">Tap to Scan</p>
-                        <p className="text-slate-400 text-xs mt-1">Check authenticity instantly</p>
-                     </div>
-                     <div className="h-14 w-14 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg animate-pulse">
-                        <ScanLine size={24}/>
-                     </div>
+                         </div>
+                         <p className="font-bold text-xl">Tap to Scan</p>
+                         <p className="text-slate-400 text-xs mt-1">Check authenticity instantly</p>
+                      </div>
+                      <div className="h-14 w-14 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg animate-pulse">
+                         <ScanLine size={24}/>
+                      </div>
                   </div>
                </div>
             </Link>
+
+            {/* ✅ NEW: DYNAMIC & COLORFUL Daily Health Tip */}
+            <div className="mt-6 bg-gradient-to-r from-rose-500 via-pink-500 to-orange-500 p-4 rounded-2xl flex items-center gap-4 shadow-xl shadow-pink-500/30 transform hover:scale-105 transition duration-300 ring-2 ring-white/20">
+                <div className="bg-white p-2.5 rounded-full text-pink-600 shadow-md animate-bounce"><Lightbulb size={24}/></div>
+                <div className="flex-1">
+                    <p className="text-[10px] font-black text-white uppercase tracking-wider mb-0.5 opacity-90">Daily Health Tip</p>
+                    {/* Key is used to trigger animation on change */}
+                    <p key={currentTip} className="text-sm font-bold text-white leading-snug drop-shadow-sm animate-fade-text">
+                        {healthTips[currentTip]}
+                    </p>
+                </div>
+            </div>
          </div>
 
          {/* -- AI Search -- */}
-         <div className="px-6 mb-6 relative z-10 -mt-2">
+         <div className="px-6 mb-6 relative z-10">
             <div className="bg-white p-2 rounded-[1.5rem] shadow-lg border border-slate-100 flex items-center">
                <div className="pl-4 text-slate-400"><Search size={20}/></div>
                <input 
@@ -217,8 +281,8 @@ export default function LandingPage() {
                <div className="mt-4 bg-white p-4 rounded-[1.5rem] border-l-4 border-emerald-500 shadow-sm flex items-center gap-4 animate-fade-in-up">
                   <div className="bg-emerald-100 p-2.5 rounded-full text-emerald-600"><CheckCircle2 size={20}/></div>
                   <div>
-                     <h4 className="font-bold text-slate-900 text-sm">{aiResult.name}</h4>
-                     <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">{aiResult.status}</p>
+                      <h4 className="font-bold text-slate-900 text-sm">{aiResult.name}</h4>
+                      <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">{aiResult.status}</p>
                   </div>
                </div>
             )}
@@ -234,7 +298,7 @@ export default function LandingPage() {
                
                {/* 📍 PHARMACY LOCATOR CARD */}
                <Link href="/features/pharmacy-locator" className="col-span-2">
-                  <div className="bg-blue-600 text-white p-4 rounded-[1.5rem] shadow-lg shadow-blue-500/20 active:scale-95 transition cursor-pointer flex flex-col justify-between h-32 relative overflow-hidden">
+                  <div className="bg-blue-600 text-white p-4 rounded-[1.5rem] shadow-lg shadow-blue-500/20 active:scale-95 transition cursor-pointer flex flex-col justify-between h-36 relative overflow-hidden">
                       <div className="relative z-10">
                           <MapPin size={24} className="opacity-80 mb-2"/>
                           <div>
@@ -242,25 +306,28 @@ export default function LandingPage() {
                               <p className="text-[10px] opacity-70">Locator</p>
                           </div>
                       </div>
-                      {/* Decorative Circle */}
                       <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-white/20 rounded-full blur-xl"></div>
                   </div>
                </Link>
 
-               <div className="col-span-2 grid grid-rows-2 gap-3 h-32">
+               <div className="col-span-2 grid grid-rows-2 gap-3 h-36">
                    <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition" onClick={() => handleFeatureClick('Report')}>
                       <div className="bg-red-100 text-red-500 p-2 rounded-full"><AlertTriangle size={16}/></div>
                       <span className="text-xs font-bold text-slate-700">Report Fake</span>
                    </div>
-                   <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition" onClick={() => handleFeatureClick('Reminder')}>
-                      <div className="bg-orange-100 text-orange-500 p-2 rounded-full"><Bell size={16}/></div>
-                      <span className="text-xs font-bold text-slate-700">Reminders</span>
+                   {/* ✅ Safety Score */}
+                   <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition">
+                      <div className="bg-emerald-100 text-emerald-500 p-2 rounded-full"><Award size={16}/></div>
+                      <div>
+                         <span className="text-[10px] text-slate-400 block uppercase font-bold">Safety Score</span>
+                         <span className="text-xs font-black text-slate-800">98/100</span>
+                      </div>
                    </div>
                </div>
             </div>
          </div>
 
-         {/* -- Scrolling Ticker -- */}
+         {/* -- ✅ FIXED: Scrolling Tickers (Partners + Quotes) -- */}
          <div className="mb-8 space-y-1">
             <div className="bg-slate-900 py-3 overflow-hidden shadow-inner">
                 <div className="animate-scroll flex gap-8 items-center px-4">
@@ -271,6 +338,7 @@ export default function LandingPage() {
                     ))}
                 </div>
             </div>
+            {/* ✅ Quotes Section Restored */}
             <div className="bg-blue-900 py-2 overflow-hidden border-t border-blue-800">
                 <div className="animate-scroll-reverse flex gap-8 items-center px-4">
                     {[...quotes, ...quotes].map((q, i) => (
@@ -295,38 +363,36 @@ export default function LandingPage() {
                </div>
             </div>
 
-            {/* Live Stats Counters */}
+            {/* Live Stats */}
             <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl flex flex-col items-center justify-center text-center">
                     <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Genuine Scans</p>
                     <p className="text-xl font-black text-slate-900 mt-1">{liveStats.genuine.toLocaleString()}</p>
-                    <TrendingUp size={14} className="text-emerald-500 mt-1"/>
                 </div>
                 <div className="bg-red-50 border border-red-100 p-3 rounded-2xl flex flex-col items-center justify-center text-center">
                     <p className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Fakes Blocked</p>
                     <p className="text-xl font-black text-slate-900 mt-1">{liveStats.fake.toLocaleString()}</p>
-                    <TrendingDown size={14} className="text-red-500 mt-1"/>
                 </div>
             </div>
             
             <div className="space-y-3">
                {mobileActivities.map((item) => (
                   <div key={item.id} className={`bg-white p-3 rounded-[1.2rem] border shadow-sm flex justify-between items-center transition-all duration-300 ${item.status === 'Fake Alert' ? 'border-red-100 border-l-4 border-l-red-500' : 'border-slate-100 border-l-4 border-l-emerald-500'}`}>
-                     <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.status === 'Verified' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                      <div className="flex items-center gap-3">
+                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.status === 'Verified' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                             {item.status === 'Verified' ? <CheckCircle2 size={18}/> : <AlertTriangle size={18}/>}
-                        </div>
-                        <div>
-                           <p className="font-bold text-sm text-slate-800 leading-tight">{item.drug}</p>
-                           <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5"><MapPin size={8}/> {item.location}</p>
-                        </div>
-                     </div>
-                     <div className="text-right">
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${item.status === 'Verified' ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
+                         </div>
+                         <div>
+                            <p className="font-bold text-sm text-slate-800 leading-tight">{item.drug}</p>
+                            <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5"><MapPin size={8}/> {item.location}</p>
+                         </div>
+                      </div>
+                      <div className="text-right">
+                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${item.status === 'Verified' ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
                             {item.status === 'Verified' ? 'Authentic' : 'Fake'}
-                        </span>
-                        <p className="text-[9px] text-slate-400 mt-1 font-mono">{item.time}</p>
-                     </div>
+                         </span>
+                         <p className="text-[9px] text-slate-400 mt-1 font-mono">{item.time}</p>
+                      </div>
                   </div>
                ))}
             </div>
@@ -340,7 +406,7 @@ export default function LandingPage() {
             </div>
          )}
 
-         {/* -- Mobile Bottom Nav (Floating Dock) -- */}
+         {/* -- Mobile Bottom Nav -- */}
          <div className="fixed bottom-6 left-6 right-6 z-50">
              <div className="bg-white/90 backdrop-blur-xl border border-white/50 p-2 rounded-[2rem] shadow-2xl shadow-slate-200 flex justify-between items-center px-6">
                 <div className="flex flex-col items-center text-blue-600 gap-1 cursor-pointer">
@@ -349,7 +415,6 @@ export default function LandingPage() {
                 <div className="flex flex-col items-center text-slate-400 gap-1 cursor-pointer hover:text-slate-600 transition">
                    <Search size={22}/>
                 </div>
-                {/* Center Scan Button in Dock */}
                 <div className="-mt-8">
                    <Link href="/track">
                       <div className="bg-slate-900 text-white p-4 rounded-full shadow-xl shadow-slate-900/30 active:scale-95 transition border-4 border-[#F8FAFC]">
@@ -414,15 +479,17 @@ export default function LandingPage() {
                   <div className="flex gap-4">
                      <Link href="/contact">
                         <button className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3 hover:bg-blue-700 transition shadow-xl shadow-blue-500/30 hover:-translate-y-1">
-                            Request Demo <ArrowRight size={20}/>
+                           Request Demo <ArrowRight size={20}/>
                         </button>
                      </Link>
                      <Link href="/docs">
                         <button className="bg-white text-slate-700 border border-slate-200 px-8 py-4 rounded-xl font-bold flex items-center gap-3 hover:border-slate-400 transition hover:-translate-y-1">
-                            View Documentation
+                           View Documentation
                         </button>
                      </Link>
                   </div>
+                  
+                  {/* Trust Indicators */}
                   <div className="mt-16 border-t border-slate-200 pt-8">
                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5">Trusted by Industry Leaders</p>
                      <div className="flex gap-10 opacity-50 grayscale hover:grayscale-0 transition-all duration-500 cursor-default">
@@ -432,11 +499,13 @@ export default function LandingPage() {
                      </div>
                   </div>
                </div>
-               <div className="relative group perspective-1000">
+               
+               {/* ✅ Hero Image Preserved */}
+               <div className="relative group perspective-1000 animate-float">
                   <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-[2.5rem] blur-2xl opacity-20 group-hover:opacity-30 transition duration-1000"></div>
                   <div className="relative bg-white rounded-[2.5rem] shadow-2xl border-[8px] border-white p-1 transform transition hover:rotate-1 duration-700 overflow-hidden">
                      <img 
-                        src="/hero.png" 
+                        src="/hero.png" // User requested to keep this
                         className="rounded-[2rem] w-full h-auto object-cover scale-105" 
                         alt="MedTrace Hero"
                      />
@@ -452,12 +521,55 @@ export default function LandingPage() {
             </div>
          </div>
 
-         {/* --- B2B Features (Bento Grid) --- */}
+         {/* --- ✅ NEW: Process Flow (How it works) --- */}
+         <div className="py-24 bg-white relative">
+            <div className="max-w-7xl mx-auto px-6">
+                <div className="text-center mb-20">
+                    <span className="text-blue-600 font-bold text-sm uppercase tracking-wider">Process</span>
+                    <h2 className="text-4xl font-black text-slate-900 mt-2">End-to-End Traceability</h2>
+                </div>
+                <div className="grid grid-cols-4 gap-8 relative">
+                    {/* Connecting Line */}
+                    <div className="absolute top-12 left-0 w-full h-0.5 bg-slate-100 -z-10"></div>
+
+                    {[
+                        { icon: Factory, title: "Manufacturing", desc: "Unique QR generation at the source." },
+                        { icon: Truck, title: "Distribution", desc: "IoT monitoring during transit." },
+                        { icon: Building2, title: "Pharmacy", desc: "Verification upon receipt." },
+                        { icon: Smartphone, title: "Consumer", desc: "Instant scan verification via app." }
+                    ].map((step, idx) => (
+                        <div key={idx} className="text-center group">
+                            <div className="w-24 h-24 bg-white border-2 border-slate-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm group-hover:border-blue-500 group-hover:shadow-blue-200 transition duration-300 relative z-10">
+                                <step.icon className="text-slate-400 group-hover:text-blue-600 transition duration-300" size={32}/>
+                                <span className="absolute -top-2 -right-2 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-sm border-4 border-white">
+                                    {idx + 1}
+                                </span>
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 mb-2">{step.title}</h3>
+                            <p className="text-slate-500 text-sm leading-relaxed px-4">{step.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+         </div>
+
+         {/* --- B2B Features (Bento Grid + Global Map) --- */}
          <div className="py-24 max-w-7xl mx-auto px-6">
             <div className="text-center mb-20">
                <h2 className="text-4xl font-black text-slate-900 tracking-tight">Enterprise Solutions</h2>
                <p className="text-slate-500 mt-3 text-lg">Scalable tools for the modern pharma ecosystem.</p>
             </div>
+            
+            {/* Global Map Visualization (Abstract) */}
+            <div className="bg-slate-900 rounded-[2.5rem] p-12 text-center relative overflow-hidden mb-12 shadow-2xl">
+               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/50 via-slate-900 to-slate-900"></div>
+               <div className="relative z-10">
+                  <Globe2 size={48} className="text-blue-500 mx-auto mb-4 animate-pulse"/>
+                  <h3 className="text-3xl font-bold text-white mb-2">Connected Global Network</h3>
+                  <p className="text-slate-400 max-w-xl mx-auto">Real-time data synchronization across borders ensuring medicine safety everywhere.</p>
+               </div>
+            </div>
+
             <div className="grid grid-cols-3 gap-8">
                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 hover:shadow-2xl hover:border-blue-200 transition duration-300 group">
                   <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center text-blue-600 mb-8 group-hover:scale-110 transition"><Truck size={32}/></div>
@@ -493,12 +605,12 @@ export default function LandingPage() {
                 <div className="grid grid-cols-2 gap-16">
                     {/* Compliance */}
                     <div>
-                        <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-2 mb-6">
                             <Award className="text-blue-600"/>
                             <h3 className="text-xl font-bold text-slate-900">Global Compliance</h3>
                         </div>
-                        <p className="text-slate-500 mb-6">Built to meet the rigorous standards of global health authorities.</p>
-                        <div className="flex gap-4">
+                        <p className="text-slate-500 mb-6 font-medium">Built to meet the rigorous standards of global health authorities.</p>
+                        <div className="flex gap-4 flex-wrap">
                             <span className="bg-white border border-slate-200 px-4 py-2 rounded-lg font-bold text-slate-600 shadow-sm">FDA 21 CFR</span>
                             <span className="bg-white border border-slate-200 px-4 py-2 rounded-lg font-bold text-slate-600 shadow-sm">EU FMD</span>
                             <span className="bg-white border border-slate-200 px-4 py-2 rounded-lg font-bold text-slate-600 shadow-sm">DSCSA</span>
@@ -506,41 +618,53 @@ export default function LandingPage() {
                     </div>
                     {/* Integrations */}
                     <div>
-                        <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-2 mb-6">
                             <Layers className="text-blue-600"/>
                             <h3 className="text-xl font-bold text-slate-900">Seamless Integrations</h3>
                         </div>
-                        <p className="text-slate-500 mb-6">Works with your existing ERP and warehouse management systems.</p>
-                        <div className="flex gap-4 opacity-70 grayscale hover:grayscale-0 transition">
-                            <span className="font-bold text-xl text-slate-800">SAP</span>
-                            <span className="font-bold text-xl text-slate-800">Oracle</span>
-                            <span className="font-bold text-xl text-slate-800">Microsoft</span>
+                        <p className="text-slate-500 mb-6 font-medium">Works with your existing ERP and warehouse management systems.</p>
+                        <div className="flex gap-6 opacity-70 grayscale hover:grayscale-0 transition items-center">
+                            <span className="font-black text-2xl text-slate-800">SAP</span>
+                            <span className="font-black text-2xl text-slate-800">Oracle</span>
+                            <span className="font-black text-2xl text-slate-800">Microsoft</span>
                         </div>
                     </div>
                 </div>
             </div>
          </div>
 
-         {/* --- ✅ NEW: Testimonials (UPDATED with Different Names) --- */}
-         <div className="py-24 bg-white">
+         {/* --- ✅ NEW: Testimonials (SCROLLING MARQUEE with SMALL RECTANGULAR CARDS) --- */}
+         <div className="py-24 bg-white overflow-hidden">
             <div className="max-w-7xl mx-auto px-6">
                 <h2 className="text-3xl font-black text-center text-slate-900 mb-16">Trusted by Pharma Executives</h2>
-                <div className="grid grid-cols-3 gap-8">
-                    {testimonials.map((item) => (
-                        <div key={item.id} className="bg-slate-50 p-8 rounded-2xl border border-slate-100 relative">
-                            <Quote className="text-blue-200 absolute top-6 left-6" size={40}/>
-                            <p className="text-slate-600 relative z-10 mb-6 mt-4 italic">"{item.quote}"</p>
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-gradient-to-br from-blue-200 to-slate-300 rounded-full flex items-center justify-center text-blue-700 font-bold">
-                                    {item.name.charAt(0)}
-                                </div>
-                                <div>
-                                    <p className="font-bold text-slate-900">{item.name}</p>
-                                    <p className="text-xs text-slate-500">{item.role}</p>
+                
+                <div className="relative">
+                    {/* Fades for scrolling effect */}
+                    <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-white to-transparent z-10"></div>
+                    <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-white to-transparent z-10"></div>
+                    
+                    {/* Hover pause logic added to track */}
+                    <div className="flex gap-6 animate-scroll hover:pause">
+                        {/* Double the array for seamless infinite scroll */}
+                        {[...testimonials, ...testimonials].map((item, i) => (
+                            // ✅ UPDATED: Width is fixed at 260px (Smaller Compact Box)
+                            <div key={i} className="w-[260px] min-w-[260px] max-w-[260px] bg-slate-50 p-6 rounded-xl border border-slate-100 relative shadow-sm hover:shadow-md transition flex flex-col hover:-translate-y-1">
+                                <Quote className="text-blue-200 absolute top-4 left-4" size={20}/>
+                                {/* ✅ Text Handling */}
+                                <p className="text-slate-600 relative z-10 mb-6 mt-6 italic text-xs leading-relaxed font-medium whitespace-normal">"{item.quote}"</p>
+                                
+                                <div className="flex items-center gap-3 mt-auto pt-4 border-t border-slate-200/50">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md shrink-0">
+                                        {item.name.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-slate-900 text-xs truncate">{item.name}</p>
+                                        <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wide truncate">{item.role}</p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </div>
          </div>
