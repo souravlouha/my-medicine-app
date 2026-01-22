@@ -9,7 +9,6 @@ export async function trackMedicineAction(query: string) {
   if (!query) return { success: false, error: "Please enter Batch ID or QR." };
 
   try {
-    // 1. ব্যাচ এবং তার মুভমেন্ট হিস্ট্রি খুঁজে বের করা
     let batch = await prisma.batch.findUnique({
       where: { batchNumber: query },
       include: {
@@ -21,7 +20,6 @@ export async function trackMedicineAction(query: string) {
       }
     });
 
-    // 2. ব্যাচ না পেলে QR কোড (Unit UID) দিয়ে খোঁজা
     let unitInfo = null;
     if (!batch) {
       const unit = await prisma.unit.findUnique({ where: { uid: query } });
@@ -42,7 +40,6 @@ export async function trackMedicineAction(query: string) {
 
     if (!batch) return { success: false, error: "No record found." };
 
-    // 3. UI-এর জন্য ডেটা সাজানো
     const fullTimeline = batch.movements.map(move => ({
       id: move.id,
       parentId: move.parentId,
@@ -85,7 +82,6 @@ export async function getTrackingData(scannedId: string) {
 
   try {
     // A. স্মার্ট QR (Unit) চেক করা
-    // যেমন: CARTON-..., BOX-..., STRIP-...
     const unit = await prisma.unit.findUnique({
       where: { uid: scannedId },
       include: {
@@ -93,6 +89,9 @@ export async function getTrackingData(scannedId: string) {
           include: {
             product: true,
             manufacturer: true,
+            recalls: { // ✅ Recall স্ট্যাটাস চেক করা হচ্ছে
+               where: { status: "ACTIVE" } 
+            }
           },
         },
       },
@@ -105,10 +104,12 @@ export async function getTrackingData(scannedId: string) {
           type: unit.type, // STRIP, BOX, or CARTON
           batchNumber: unit.batch.batchNumber,
           expDate: unit.batch.expDate,
-          mfgDate: unit.batch.mfgDate,
+          mfgDate: unit.batch.mfgDate, // ✅ Mfg Date যোগ করা হলো
           mrp: unit.batch.mrp,
           product: unit.batch.product,
           manufacturer: unit.batch.manufacturer,
+          isRecalled: unit.batch.recalls.length > 0, // ✅ Recall হলে true হবে
+          unitId: unit.uid // ✅ Strip ID পাঠানোর জন্য
         },
       };
     }
@@ -119,6 +120,7 @@ export async function getTrackingData(scannedId: string) {
       include: {
         product: true,
         manufacturer: true,
+        recalls: { where: { status: "ACTIVE" } }
       },
     });
 
@@ -133,6 +135,8 @@ export async function getTrackingData(scannedId: string) {
           mrp: batch.mrp,
           product: batch.product,
           manufacturer: batch.manufacturer,
+          isRecalled: batch.recalls.length > 0,
+          unitId: null
         },
       };
     }
