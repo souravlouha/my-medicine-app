@@ -1,159 +1,105 @@
-import { prisma } from "@/lib/prisma";
-import { CheckCircle, XCircle, Box, Calendar, MapPin, AlertTriangle, Package } from "lucide-react";
+"use client";
 
-export default async function PublicTrackingPage({ params }: { params: Promise<{ batchId: string }> }) {
-  
-  const resolvedParams = await params;
-  let { batchId } = resolvedParams;
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { Loader2, ShieldCheck, Box, Lock, AlertTriangle } from "lucide-react";
+import { getTrackingData } from "@/lib/actions/track-actions"; 
 
-  // ১. URL ডিকোড করা (যাতে %20 বা অন্য চিহ্ন সমস্যা না করে)
-  batchId = decodeURIComponent(batchId);
+export default function VerifyPage() {
+  const params = useParams();
+  const batchId = params.batchId as string;
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isRestricted, setIsRestricted] = useState(false);
 
-  console.log("🔍 Searching for ID:", batchId);
-
-  // ২. প্রথমে ব্যাচ টেবিলে খোঁজা (যদি মেইন ব্যাচ QR হয়)
-  let batch = await prisma.batch.findFirst({
-    where: {
-        OR: [
-            { batchNumber: batchId }, 
-            { id: batchId }
-        ]
-    }, 
-    include: {
-      product: true,
-      manufacturer: { select: { name: true, address: true } },
-    },
-  });
-
-  let scannedUnitType = "BATCH"; // ডিফল্ট
-
-  // ৩. যদি ব্যাচ না পাওয়া যায়, তাহলে ইউনিট (Strip/Box/Carton) টেবিলে খোঁজা
-  if (!batch) {
-    const unit = await prisma.unit.findUnique({
-        where: { uid: batchId },
-        include: {
-            batch: {
-                include: {
-                    product: true,
-                    manufacturer: { select: { name: true, address: true } }
-                }
-            }
-        }
-    });
-
-    if (unit) {
-        batch = unit.batch; // ইউনিটের প্যারেন্ট ব্যাচটি আমরা পেলাম
-        scannedUnitType = unit.type; // এটি কি STRIP, BOX না CARTON তা জানলাম
+  useEffect(() => {
+    // 🔍 1. চেক করা হচ্ছে এটা ডিস্ট্রিবিউটার প্যাকেজিং কিনা (CARTON/BOX)
+    if (batchId.startsWith("CARTON") || batchId.startsWith("BOX")) {
+       setIsRestricted(true);
+       setLoading(false);
+       return;
     }
-  }
 
-  // ৪. যদি তবুও কিছু না পাওয়া যায় - Error UI
-  if (!batch) {
+    // 🔍 2. যদি Strip বা সাধারণ Batch হয় -> ডাটা আনো
+    const fetchData = async () => {
+      try {
+        const result = await getTrackingData(batchId);
+        if (result.success) setData(result.data);
+      } catch (err) { console.error(err); } 
+      finally { setLoading(false); }
+    };
+    fetchData();
+  }, [batchId]);
+
+  if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin text-blue-600"/></div>;
+
+  // 🛑 SCENARIO A: RESTRICTED VIEW (CARTON/BOX)
+  // ডিস্ট্রিবিউটার বা রিটেইলার স্ক্যান করলে এটা দেখবে
+  if (isRestricted) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-red-50">
-        <div className="bg-white p-4 rounded-full shadow-md mb-4">
-            <XCircle className="w-16 h-16 text-red-500" />
-        </div>
-        <h1 className="text-2xl font-bold text-red-700">Invalid Medicine!</h1>
-        <p className="text-gray-600 mt-2">
-            The ID <span className="font-mono font-bold bg-gray-200 px-1 rounded break-all">{batchId}</span> was not found.
-        </p>
-        <p className="text-xs text-gray-400 mt-6">Possible fake product.</p>
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
+         <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full border border-slate-200">
+            <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+               <Box size={32} className="text-orange-600"/>
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Logistics Unit Scanned</h2>
+            <p className="text-slate-500 text-sm mb-6">
+               You have scanned a <b>{batchId.split('-')[0]}</b> (Wholesale Pack). 
+               Detailed information is restricted to authorized distributors only.
+            </p>
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-6 font-mono text-xs text-slate-600 break-all">
+               ID: {batchId}
+            </div>
+            <Link href="/login" className="flex items-center justify-center gap-2 w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-sm hover:bg-slate-800 transition">
+               <Lock size={16}/> Login to View Details
+            </Link>
+         </div>
       </div>
     );
   }
 
-  const isExpired = new Date() > new Date(batch.expDate);
-
-  // ৫. সফল UI
+  // ✅ SCENARIO B: PUBLIC VIEW (STRIP)
+  // সাধারণ মানুষ স্ক্যান করলে এটা দেখবে
   return (
-    <div className="min-h-screen bg-gray-50 pb-10">
-      
-      {/* Header */}
-      <div className="bg-blue-600 p-8 rounded-b-[40px] shadow-xl text-white text-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <h1 className="text-2xl font-bold relative z-10">MedTrace Verified</h1>
-        
-        <div className="mt-4 flex justify-center gap-2">
-            <div className="bg-white/20 border border-white/30 p-2 rounded-full inline-flex items-center gap-2 px-4 backdrop-blur-md relative z-10 shadow-sm">
-                <CheckCircle className="w-4 h-4 text-green-300" />
-                <span className="font-bold text-xs tracking-wide">Authentic Product</span>
-            </div>
-            
-            {/* Scanned Unit Badge */}
-            {scannedUnitType !== "BATCH" && (
-                <div className="bg-purple-500/30 border border-white/30 p-2 rounded-full inline-flex items-center gap-2 px-4 backdrop-blur-md relative z-10 shadow-sm">
-                    <Package className="w-4 h-4 text-purple-200" />
-                    <span className="font-bold text-xs tracking-wide">{scannedUnitType} Verified</span>
+    <div className="min-h-screen bg-slate-50 pb-10">
+       <div className="bg-emerald-600 pt-10 pb-20 px-6 rounded-b-[3rem] shadow-xl text-center">
+          <ShieldCheck size={48} className="text-white mx-auto mb-4"/>
+          <h1 className="text-2xl font-black text-white">Verified Authentic</h1>
+          <p className="text-emerald-100 text-sm">This medicine is safe to consume.</p>
+       </div>
+       
+       <div className="px-6 -mt-12">
+          <div className="bg-white rounded-[2rem] shadow-lg p-6 border border-slate-100">
+             <h2 className="text-xl font-bold text-slate-900">{data?.product?.name || "Medicine Details"}</h2>
+             <div className="flex items-center gap-2 mt-1">
+                <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{data?.product?.type || "MEDICINE"}</span>
+                <p className="text-slate-400 text-xs font-bold uppercase">Batch: {data?.batchNumber || batchId}</p>
+             </div>
+             
+             {/* সাধারণ মানুষের জন্য সিম্পল তথ্য */}
+             <div className="mt-6 grid grid-cols-2 gap-4">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Expiry Date</p>
+                   <p className="font-bold text-red-500 text-lg">{data?.expDate ? new Date(data.expDate).toLocaleDateString() : "N/A"}</p>
                 </div>
-            )}
-        </div>
-      </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">MRP</p>
+                   <p className="font-bold text-slate-800 text-lg">₹{data?.mrp}</p>
+                </div>
+             </div>
 
-      <div className="p-6 space-y-6 -mt-6 relative z-20">
-        
-        {/* Product Card */}
-        <div className="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-          <h2 className="text-2xl font-black text-gray-800 leading-tight">{batch.product.name}</h2>
-          <p className="text-gray-500 text-sm mt-1 font-medium">{batch.product.genericName}</p>
-          
-          <div className="mt-6 flex gap-3 text-sm">
-            <div className="bg-blue-50 p-4 rounded-2xl flex-1 text-center border border-blue-100">
-               <p className="text-blue-500 text-[10px] font-bold uppercase tracking-wider">Batch No</p>
-               <p className="font-mono font-bold text-gray-800 text-lg mt-1">{batch.batchNumber}</p>
-            </div>
-            <div className="bg-purple-50 p-4 rounded-2xl flex-1 text-center border border-purple-100">
-               <p className="text-purple-500 text-[10px] font-bold uppercase tracking-wider">Price (MRP)</p>
-               <p className="font-mono font-bold text-gray-800 text-lg mt-1">₹{batch.mrp}</p>
-            </div>
+             <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <p className="text-xs text-blue-800 text-center font-medium">
+                   Manufactured by <b>{data?.manufacturer?.name || "Premium Pharma"}</b>
+                </p>
+             </div>
           </div>
-        </div>
+       </div>
 
-        {/* Status Card (Expired or Safe) */}
-        {isExpired ? (
-            <div className="bg-red-50 border border-red-200 p-5 rounded-3xl flex items-start gap-4 text-red-800 shadow-sm">
-                <div className="bg-red-100 p-2 rounded-full">
-                    <AlertTriangle className="w-6 h-6 text-red-600"/>
-                </div>
-                <div>
-                    <p className="font-bold text-lg">EXPIRED PRODUCT</p>
-                    <p className="text-sm opacity-90 mt-1">This medicine expired on {new Date(batch.expDate).toLocaleDateString()}. Do not use.</p>
-                </div>
-            </div>
-        ) : (
-            <div className="bg-green-50 border border-green-200 p-5 rounded-3xl flex items-start gap-4 text-green-800 shadow-sm">
-                <div className="bg-green-100 p-2 rounded-full">
-                    <Calendar className="w-6 h-6 text-green-600"/>
-                </div>
-                <div>
-                    <p className="font-bold text-lg">Valid & Safe to Use</p>
-                    <p className="text-sm opacity-90 mt-1">Expiry Date: <span className="font-bold">{new Date(batch.expDate).toLocaleDateString()}</span></p>
-                </div>
-            </div>
-        )}
-
-        {/* Manufacturer Details */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-            <h3 className="font-bold text-gray-400 text-xs uppercase mb-4 flex items-center gap-2 tracking-wider">
-                Manufactured By
-            </h3>
-            <div className="flex gap-4 items-start">
-                <div className="bg-gray-100 p-3 rounded-xl">
-                    <Box className="w-6 h-6 text-gray-600"/>
-                </div>
-                <div>
-                    <p className="font-bold text-gray-900 text-lg">{batch.manufacturer.name}</p>
-                    <p className="text-sm text-gray-500 mt-2 flex items-start gap-2 leading-relaxed">
-                        <MapPin className="w-4 h-4 shrink-0 mt-1 text-gray-400"/> 
-                        {batch.manufacturer.address}
-                    </p>
-                </div>
-            </div>
-        </div>
-
-      </div>
-      
-      <p className="text-center text-[10px] text-gray-300 mt-6 uppercase tracking-widest">Secured by MedTrace</p>
+       <p className="text-center text-slate-400 text-[10px] mt-8">
+          Scan ID: {batchId}
+       </p>
     </div>
   );
 }

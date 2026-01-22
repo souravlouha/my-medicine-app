@@ -51,7 +51,7 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     const res = await createAdvancedBatchAction(formData);
 
     if (res.success) {
-      // ✅ FIX: এখানে (res.batchId || "") এবং (res.batchNo || "") দেওয়া হলো টাইপ এরর ফিক্স করতে
+      // ✅ FIX: এখানে (res.batchId || "") এবং (res.batchNo || "") দেওয়া হলো টাইপ এরর ফিক্স করতে
       setCreatedBatch({ 
           id: res.batchId || "", 
           no: res.batchNo || "" 
@@ -91,55 +91,72 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
         {/* 🔥 THE FULL HIERARCHY TREE VIEW 🔥 */}
         <div className="space-y-8 print-area">
            {/* Loop 1: Cartons */}
-           {Array.from({ length: totalCartons }).map((_, cIndex) => (
+           {Array.from({ length: totalCartons }).map((_, cIndex) => {
+             // 👇 লজিক আপডেট: Backend ID Format (CARTON-Batch-Index)
+             const cartonId = `CARTON-${createdBatch.no}-${cIndex+1}`;
+             
+             return (
              <div key={cIndex} className="border-4 border-gray-800 rounded-3xl p-8 bg-white relative break-inside-avoid">
                
-                {/* Carton Header */}
-                <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6">
-                   <div className="bg-white p-2 border border-gray-200 rounded-lg">
-                      {/* 👇 QR Link আপডেট করা হয়েছে: baseUrl ব্যবহার করে */}
-                      <QRCode value={`${baseUrl}/verify/${createdBatch.no}-CTN-${cIndex+1}`} size={100} />
-                   </div>
-                   <div>
-                      <h3 className="text-2xl font-black uppercase text-gray-900">CARTON: {createdBatch.no}-CTN-{cIndex+1}</h3>
-                      <p className="text-sm text-gray-500 font-bold mt-1">Contains {boxesPerCarton} Boxes</p>
-                   </div>
-                </div>
+               {/* Carton Header */}
+               <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6">
+                  <div className="bg-white p-2 border border-gray-200 rounded-lg">
+                     {/* 👇 QR Link আপডেট করা হয়েছে: baseUrl + ID Match */}
+                     <QRCode value={`${baseUrl}/verify/${cartonId}`} size={100} />
+                  </div>
+                  <div>
+                     <h3 className="text-2xl font-black uppercase text-gray-900">CARTON: {cIndex+1}</h3>
+                     <p className="font-mono text-gray-500 font-bold">{cartonId}</p>
+                     <p className="text-sm text-gray-400 mt-1">Contains {boxesPerCarton} Boxes</p>
+                  </div>
+               </div>
 
-                {/* Loop 2: Boxes Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   {Array.from({ length: boxesPerCarton }).map((_, bIndex) => (
-                     <div key={bIndex} className="border-2 border-gray-300 rounded-2xl p-5 bg-gray-50 break-inside-avoid">
-                        
-                        {/* Box Header */}
-                        <div className="flex items-center gap-4 mb-4">
-                           <div className="bg-white p-1.5 border border-gray-200 rounded">
+               {/* Loop 2: Boxes Grid */}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {Array.from({ length: boxesPerCarton }).map((_, bIndex) => {
+                    // 👇 লজিক আপডেট: Backend ID Format (BOX-Batch-C-B)
+                    const boxId = `BOX-${createdBatch.no}-${cIndex+1}-${bIndex+1}`;
+
+                    return (
+                    <div key={bIndex} className="border-2 border-gray-300 rounded-2xl p-5 bg-gray-50 break-inside-avoid">
+                       
+                       {/* Box Header */}
+                       <div className="flex items-center gap-4 mb-4">
+                          <div className="bg-white p-1.5 border border-gray-200 rounded">
                              {/* 👇 QR Link আপডেট করা হয়েছে */}
-                             <QRCode value={`${baseUrl}/verify/${createdBatch.no}-BOX-${cIndex+1}-${bIndex+1}`} size={60} />
-                           </div>
-                           <div>
-                             <p className="text-sm font-black uppercase text-gray-700">BOX: ...-BOX-{cIndex+1}-{bIndex+1}</p>
-                             <p className="text-[10px] text-gray-500 font-bold">Contains {stripsPerBox} Strips</p>
-                           </div>
-                        </div>
+                             <QRCode value={`${baseUrl}/verify/${boxId}`} size={60} />
+                          </div>
+                          <div>
+                             <p className="text-sm font-black uppercase text-gray-700">BOX: {bIndex+1}</p>
+                             <p className="text-[10px] text-gray-500 font-bold font-mono">{boxId}</p>
+                             <p className="text-[10px] text-gray-400">Contains {stripsPerBox} Strips</p>
+                          </div>
+                       </div>
 
-                        {/* Loop 3: Strips Grid (Small Items) */}
-                        <div className="grid grid-cols-5 gap-3">
-                           {Array.from({ length: stripsPerBox }).map((_, sIndex) => (
-                             <div key={sIndex} className="flex flex-col items-center bg-white p-2 rounded border border-gray-200 shadow-sm hover:border-blue-400 transition">
-                                {/* 👇 QR Link আপডেট করা হয়েছে */}
-                                <QRCode value={`${baseUrl}/verify/${createdBatch.no}-ST-${cIndex+1}-${bIndex+1}-${sIndex+1}`} size={40} />
-                                <span className="text-[8px] font-mono font-bold mt-1 text-gray-400">{sIndex+1}</span>
-                             </div>
-                           ))}
-                        </div>
+                       {/* Loop 3: Strips Grid (Small Items) */}
+                       <div className="grid grid-cols-5 gap-3">
+                          {Array.from({ length: stripsPerBox }).map((_, sIndex) => {
+                            // 👇 লজিক আপডেট: Backend ID Format (STRIP-Batch-C-B-S)
+                            const stripId = `STRIP-${createdBatch.no}-${cIndex+1}-${bIndex+1}-${sIndex+1}`;
 
-                     </div>
-                   ))}
-                </div>
+                            return (
+                            <div key={sIndex} className="flex flex-col items-center bg-white p-2 rounded border border-gray-200 shadow-sm hover:border-blue-400 transition">
+                               {/* 👇 QR Link আপডেট করা হয়েছে */}
+                               <QRCode value={`${baseUrl}/verify/${stripId}`} size={40} />
+                               <span className="text-[8px] font-mono font-bold mt-1 text-gray-400">{sIndex+1}</span>
+                            </div>
+                            )
+                          })}
+                       </div>
+
+                    </div>
+                    )
+                  })}
+               </div>
 
              </div>
-           ))}
+             )
+           })}
         </div>
 
       </div>

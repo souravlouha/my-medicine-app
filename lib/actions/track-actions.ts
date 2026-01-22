@@ -2,6 +2,9 @@
 
 import { prisma } from "@/lib/prisma";
 
+// =========================================================
+// 1. EXISTING TRACKING ACTION (Internal App Tracking)
+// =========================================================
 export async function trackMedicineAction(query: string) {
   if (!query) return { success: false, error: "Please enter Batch ID or QR." };
 
@@ -13,15 +16,12 @@ export async function trackMedicineAction(query: string) {
         product: true,
         manufacturer: true,
         inventory: { include: { user: true } },
-        // 🌳 নতুন টেবিল ফেচ করা
-        movements: {
-          orderBy: { createdAt: 'asc' }
-        },
+        movements: { orderBy: { createdAt: 'asc' } },
         recalls: true,
       }
     });
 
-    // 2. ব্যাচ না পেলে QR কোড দিয়ে খোঁজা
+    // 2. ব্যাচ না পেলে QR কোড (Unit UID) দিয়ে খোঁজা
     let unitInfo = null;
     if (!batch) {
       const unit = await prisma.unit.findUnique({ where: { uid: query } });
@@ -45,7 +45,7 @@ export async function trackMedicineAction(query: string) {
     // 3. UI-এর জন্য ডেটা সাজানো
     const fullTimeline = batch.movements.map(move => ({
       id: move.id,
-      parentId: move.parentId, // এটি ট্রি বানাতে লাগবে
+      parentId: move.parentId,
       from: move.senderName,
       distributor: move.receiverName,
       role: move.role,
@@ -74,5 +74,73 @@ export async function trackMedicineAction(query: string) {
   } catch (error: any) {
     console.error("Tracking Error:", error);
     return { success: false, error: "Failed to track medicine." };
+  }
+}
+
+// =========================================================
+// 2. NEW: PUBLIC VERIFICATION ACTION (Smart QR / Google Lens)
+// =========================================================
+export async function getTrackingData(scannedId: string) {
+  if (!scannedId) return { success: false, error: "Invalid ID" };
+
+  try {
+    // A. স্মার্ট QR (Unit) চেক করা
+    // যেমন: CARTON-..., BOX-..., STRIP-...
+    const unit = await prisma.unit.findUnique({
+      where: { uid: scannedId },
+      include: {
+        batch: {
+          include: {
+            product: true,
+            manufacturer: true,
+          },
+        },
+      },
+    });
+
+    if (unit) {
+      return {
+        success: true,
+        data: {
+          type: unit.type, // STRIP, BOX, or CARTON
+          batchNumber: unit.batch.batchNumber,
+          expDate: unit.batch.expDate,
+          mfgDate: unit.batch.mfgDate,
+          mrp: unit.batch.mrp,
+          product: unit.batch.product,
+          manufacturer: unit.batch.manufacturer,
+        },
+      };
+    }
+
+    // B. সাধারণ ব্যাচ নম্বর চেক করা
+    const batch = await prisma.batch.findUnique({
+      where: { batchNumber: scannedId },
+      include: {
+        product: true,
+        manufacturer: true,
+      },
+    });
+
+    if (batch) {
+      return {
+        success: true,
+        data: {
+          type: "BATCH",
+          batchNumber: batch.batchNumber,
+          expDate: batch.expDate,
+          mfgDate: batch.mfgDate,
+          mrp: batch.mrp,
+          product: batch.product,
+          manufacturer: batch.manufacturer,
+        },
+      };
+    }
+
+    return { success: false, error: "Product verification failed." };
+
+  } catch (error) {
+    console.error("Verification Error:", error);
+    return { success: false, error: "Internal Server Error" };
   }
 }

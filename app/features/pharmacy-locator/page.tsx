@@ -1,138 +1,69 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import { ArrowLeft, MapPin, Navigation, Loader2, Crosshair } from "lucide-react";
-
-// ⚠️ ম্যাপ কম্পোনেন্টটি ডাইনামিক ইম্পোর্ট করা হচ্ছে (SSR বন্ধ রাখার জন্য)
-const PharmacyMap = dynamic(() => import("@/components/PharmacyMap"), {
-  ssr: false,
-  loading: () => (
-    <div className="h-full w-full flex items-center justify-center bg-slate-200">
-      <Loader2 className="animate-spin text-blue-600" size={40} />
-      <span className="ml-2 text-slate-600">মানচিত্র লোড হচ্ছে...</span>
-    </div>
-  ),
-});
+import { MapPin, Navigation, ArrowLeft, Sparkles } from "lucide-react";
 
 export default function PharmacyLocator() {
-  // ডিফল্ট: কলকাতা
-  const defaultLocation = { lat: 22.5726, lng: 88.3639 };
-  const [location, setLocation] = useState(defaultLocation);
-  const [hasLocation, setHasLocation] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [selectedPharmacy, setSelectedPharmacy] = useState<number | null>(null);
-  
-  // ডামি ডাটা জেনারেটর
-  const generatePharmacies = (lat: number, lng: number) => {
-    return [
-      { id: 1, name: "City Pharmacy", lat: lat + 0.0015, lng: lng + 0.0010, distance: "200m", address: "Main Road", open: true },
-      { id: 2, name: "Jibon Deep", lat: lat - 0.0020, lng: lng - 0.0015, distance: "500m", address: "College Para", open: true },
-      { id: 3, name: "Health Care", lat: lat + 0.0030, lng: lng - 0.0020, distance: "800m", address: "Station Road", open: false },
-      { id: 4, name: "Sanjivani", lat: lat - 0.0010, lng: lng + 0.0040, distance: "1.2 km", address: "Hospital Gate", open: true },
-    ];
-  };
-
-  const [pharmacies, setPharmacies] = useState<any[]>([]);
-
-  // শুরুতে ডিফল্ট লোকেশনের দোকান দেখাবে
-  useEffect(() => {
-    setPharmacies(generatePharmacies(defaultLocation.lat, defaultLocation.lng));
-  }, []);
-
-  const handleGetLocation = () => {
-    setLoading(true);
-    if (!navigator.geolocation) {
-      alert("আপনার ব্রাউজারে লোকেশন সাপোর্ট নেই।");
-      setLoading(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setLocation({ lat: latitude, lng: longitude });
-        setPharmacies(generatePharmacies(latitude, longitude));
-        setHasLocation(true);
-        setLoading(false);
-      },
-      (error) => {
-        console.error(error);
-        alert("লোকেশন পাওয়া যাচ্ছে না। দয়া করে ব্রাউজারের লোকেশন পারমিশন চেক করুন।");
-        setLoading(false);
-      },
-      { enableHighAccuracy: true }
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
       
-      {/* --- Header --- */}
-      <div className="bg-white px-4 py-4 flex items-center gap-4 shadow-md z-30 sticky top-0">
-        <Link href="/" className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition">
-            <ArrowLeft size={20} className="text-slate-700"/>
-        </Link>
-        <div className="flex-1">
-            <h1 className="text-lg font-bold text-slate-900">ফার্মেসি খুঁজুন</h1>
-            <p className="text-xs text-slate-500 flex items-center gap-1">
-                <MapPin size={10} /> 
-                {hasLocation ? "আপনার লোকেশন" : "ডিফল্ট ভিউ (কলকাতা)"}
-            </p>
+      {/* --- Background Animation (সাজসজ্জা) --- */}
+      <div className="absolute top-0 left-0 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+      <div className="absolute bottom-0 right-0 w-72 h-72 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000"></div>
+
+      <div className="relative z-10 max-w-md w-full bg-white p-8 md:p-12 rounded-[2.5rem] shadow-2xl border border-white/50 text-center">
+        
+        {/* --- Animated Icon --- */}
+        <div className="relative w-28 h-28 mx-auto mb-8">
+          {/* Ping Effect */}
+          <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
+          
+          {/* Main Circle */}
+          <div className="relative bg-gradient-to-br from-blue-600 to-blue-500 w-28 h-28 rounded-full flex items-center justify-center shadow-blue-300 shadow-xl text-white">
+             <MapPin size={48} />
+          </div>
+
+          {/* Floating Icon */}
+          <div className="absolute -bottom-2 -right-2 bg-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-slate-50 text-emerald-500 animate-bounce">
+             <Navigation size={20} fill="currentColor"/>
+          </div>
         </div>
-        <button 
-          onClick={handleGetLocation}
-          className={`p-3 rounded-full shadow-lg transition ${hasLocation ? 'bg-green-600 text-white' : 'bg-blue-600 text-white animate-bounce'}`}
+
+        {/* --- Text Content --- */}
+        <div className="mb-2 flex items-center justify-center gap-2">
+           <Sparkles size={16} className="text-amber-400"/>
+           <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">Under Construction</span>
+        </div>
+
+        <h1 className="text-3xl font-black text-slate-900 mb-4">
+          Coming <span className="text-blue-600">Soon!</span>
+        </h1>
+        
+        <p className="text-slate-500 mb-8 leading-relaxed font-medium">
+           আমরা একটি শক্তিশালী <b>স্মার্ট ম্যাপ</b> তৈরি করছি। খুব শীঘ্রই আপনি জিপিএস-এর মাধ্যমে আপনার কাছের সব ফার্মেসি এবং ওষুধের স্টক দেখতে পাবেন।
+        </p>
+
+        {/* --- Upcoming Features List --- */}
+        <div className="flex flex-wrap justify-center gap-2 mb-10">
+           <span className="px-4 py-1.5 bg-blue-50 border border-blue-100 rounded-full text-[10px] font-bold text-blue-600">Live GPS</span>
+           <span className="px-4 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full text-[10px] font-bold text-emerald-600">Stock Check</span>
+           <span className="px-4 py-1.5 bg-purple-50 border border-purple-100 rounded-full text-[10px] font-bold text-purple-600">Route Map</span>
+        </div>
+
+        {/* --- Home Button --- */}
+        <Link 
+          href="/" 
+          className="flex items-center justify-center gap-2 w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 hover:scale-[1.02] transition-all duration-300 shadow-xl shadow-slate-200"
         >
-          {loading ? <Loader2 size={20} className="animate-spin"/> : <Crosshair size={20}/>}
-        </button>
+          <ArrowLeft size={20} />
+          হোম পেজে ফিরে যান
+        </Link>
       </div>
 
-      {/* --- Map Area --- */}
-      <div className="flex-1 relative w-full h-[55vh] z-0 bg-slate-200">
-         {/* এখানে আমরা আলাদা করা ম্যাপ কম্পোনেন্ট লোড করছি */}
-         <PharmacyMap 
-            location={location} 
-            pharmacies={pharmacies} 
-            onSelect={(id: number) => setSelectedPharmacy(id)}
-         />
-      </div>
-
-      {/* --- Pharmacy List --- */}
-      <div className="bg-white rounded-t-[2rem] shadow-[0_-5px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 p-6 pb-20 min-h-[45vh] overflow-y-auto">
-         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sticky top-0"></div>
-         <h2 className="text-lg font-bold text-slate-900 mb-4">কাছাকাছি ফার্মেসি</h2>
-         
-         <div className="space-y-4">
-            {pharmacies.map((item) => (
-                <div 
-                    key={item.id} 
-                    className={`p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer ${selectedPharmacy === item.id ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white'}`}
-                    onClick={() => {
-                      setSelectedPharmacy(item.id);
-                      setLocation({ lat: item.lat, lng: item.lng });
-                    }}
-                >
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-50 text-blue-600 rounded-full">
-                            <MapPin size={20}/>
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-slate-900 text-sm">{item.name}</h3>
-                            <p className="text-xs text-slate-500 mb-1">{item.address}</p>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${item.open ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                {item.open ? 'Open' : 'Closed'}
-                            </span>
-                        </div>
-                    </div>
-                    <button className="p-2 bg-slate-100 rounded-full text-slate-600">
-                        <Navigation size={16}/>
-                    </button>
-                </div>
-            ))}
-         </div>
-      </div>
+      {/* Footer Text */}
+      <p className="absolute bottom-6 text-slate-400 text-xs font-medium">
+        My Medicine App &copy; 2026
+      </p>
     </div>
   );
 }
