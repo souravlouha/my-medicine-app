@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { loginAction } from "@/lib/actions/auth-actions"; // আপনার ফোল্ডার নাম অনুযায়ী ঠিক রাখুন
+import { loginAction } from "@/lib/actions/auth-actions"; 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Printer } from "lucide-react"; // ✅ আইকন ইম্পোর্ট করা হলো
+import { Printer } from "lucide-react"; 
+
+// ফিক্স করার জন্য টাইপ ইন্টারফেস
+interface LoginResponse {
+  success: boolean;
+  error?: string;
+  redirectUrl?: string;
+}
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -15,10 +22,10 @@ export default function LoginPage() {
     setLoading(true);
     
     const formData = new FormData(event.currentTarget);
-    const result = await loginAction(formData);
+    const result = await loginAction(formData) as LoginResponse; // ✅ টাইপ কাস্টিং করা হলো
 
     if (result.success) {
-      // ✅ সফল লগইন
+      // ✅ সফল লগইন - বিল্ড এরর এখন আর আসবে না
       router.push(result.redirectUrl || "/dashboard");
     } else {
       alert("❌ " + result.error);
@@ -68,11 +75,11 @@ export default function LoginPage() {
            <div className="mt-6 text-center text-sm">
               <span className="text-gray-500">Don't have an account? </span>
               <Link href="/register" className="text-blue-600 font-bold hover:underline">
-                 Create Account
+                  Create Account
               </Link>
            </div>
 
-           {/* 👇 ✅ OPERATOR BUTTON ADDED HERE 👇 */}
+           {/* 🏭 Factory Operations Section */}
            <div className="mt-8 pt-6 border-t border-gray-100 text-center">
               <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider font-bold">Factory Operations</p>
               
@@ -83,10 +90,7 @@ export default function LoginPage() {
                 </button>
               </Link>
            </div>
-           {/* 👆 End of Operator Section 👆 */}
-
         </div>
-
       </div>
     </div>
   );
