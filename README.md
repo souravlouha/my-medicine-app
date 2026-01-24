@@ -12,6 +12,9 @@ my-medicine-app
 │  │     └─ [id]
 │  │        └─ page.tsx
 │  ├─ api
+│  │  └─ auth
+│  │     └─ [...nextauth]
+│  │        └─ route.ts
 │  ├─ contact
 │  │  └─ page.tsx
 │  ├─ dashboard
@@ -63,6 +66,11 @@ my-medicine-app
 │  │  │  │        ├─ ConfirmButton.tsx
 │  │  │  │        └─ page.tsx
 │  │  │  ├─ page.tsx
+│  │  │  ├─ production
+│  │  │  │  ├─ assign
+│  │  │  │  │  └─ page.tsx
+│  │  │  │  ├─ operator-mode
+│  │  │  │  └─ page.tsx
 │  │  │  ├─ quality
 │  │  │  │  └─ page.tsx
 │  │  │  ├─ recall
@@ -105,14 +113,20 @@ my-medicine-app
 │  │  └─ page.tsx
 │  ├─ favicon.ico
 │  ├─ features
+│  │  ├─ generic-finder
 │  │  └─ pharmacy-locator
-│  │     ├─ MapUpdater.js
 │  │     └─ page.tsx
 │  ├─ globals.css
 │  ├─ layout.tsx
+│  ├─ operator
+│  │  ├─ page.tsx
+│  │  └─ panel
+│  │     └─ [code]
+│  │        └─ page.tsx
 │  ├─ page.tsx
 │  ├─ track
-│  │  └─ page.tsx
+│  │  ├─ page.tsx
+│  │  └─ TrackClient.tsx
 │  └─ verify
 │     └─ [batchId]
 │        └─ page.tsx
@@ -126,6 +140,7 @@ my-medicine-app
 │  │  └─ Sidebar.tsx
 │  ├─ EditProfileModal.tsx
 │  ├─ ManufacturerHeader.tsx
+│  ├─ PharmacyMap.tsx
 │  ├─ RecallButton.tsx
 │  ├─ RetailerCharts.tsx
 │  ├─ tracking
@@ -143,11 +158,13 @@ my-medicine-app
 │  │  ├─ log-actions.ts
 │  │  ├─ manufacturer-actions.ts
 │  │  ├─ pos-actions.ts
+│  │  ├─ production-actions.ts
 │  │  ├─ profile-actions.ts
 │  │  ├─ recall-actions.ts
 │  │  ├─ retailer-actions.ts
 │  │  ├─ sales-actions.ts
 │  │  ├─ shipment-actions.ts
+│  │  ├─ team-actions.ts
 │  │  └─ track-actions.ts
 │  ├─ actions.ts
 │  ├─ auth.ts

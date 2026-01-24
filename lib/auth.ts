@@ -6,7 +6,8 @@ import bcrypt from "bcryptjs"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt" }, // আমরা JWT ব্যবহার করছি যাতে Edge-এ সমস্যা না হয়
+  secret: process.env.AUTH_SECRET, // এটি নিশ্চিত করে যে সিক্রেট ঠিকঠাক পাচ্ছে
   
   providers: [
     Credentials({
@@ -21,16 +22,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = credentials.email as string;
         const password = credentials.password as string;
 
-        // ডাটাবেসে ইউজার খোঁজা
         const user = await prisma.user.findUnique({
           where: { email },
         });
 
         if (!user) return null;
 
-        // পাসওয়ার্ড চেক (bcrypt ব্যবহার করে)
         const passwordsMatch = await bcrypt.compare(password, user.password);
-        
         if (!passwordsMatch) return null;
 
         return user;
@@ -42,24 +40,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        token.role = (user as any).role;
+        token.role = (user as any).role; // রোল টোকেনে ঢুকানো হচ্ছে
       }
       return token;
     },
     async session({ session, token }) {
       if (token.sub && session.user) {
         session.user.id = token.sub;
-        (session.user as any).role = token.role;
+        (session.user as any).role = token.role; // সেশনে রোল সেট করা হচ্ছে
       }
       return session;
     }
   },
 })
 
-/**
- * ✅ এই হেল্পার ফাংশনটি আপনার বিল্ড এরর ফিক্স করবে।
- * প্রোজেক্টের অন্যান্য ফাইল এটি এখান থেকে ইমপোর্ট করতে পারবে।
- */
+// হেল্পার ফাংশন
 export const currentUser = async () => {
   const session = await auth();
   return session?.user;
