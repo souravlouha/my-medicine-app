@@ -1,89 +1,53 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-import { signIn, signOut, auth } from "@/lib/auth"; // ✅ auth ও ইম্পোর্ট করুন
+import { signIn, auth } from "@/lib/auth";
 import { AuthError } from "next-auth";
 
-interface AuthResponse {
-  success: boolean;
-  error?: string;
-  redirectUrl?: string; 
-}
+// ... আগের ইন্টারফেস এবং রেজিস্টার লজিক ...
 
-// ✅ REGISTER ACTION
-export async function registerAction(formData: FormData) {
-  const name = formData.get("name") as string;
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const role = formData.get("role") as string;
-  const licenseNo = formData.get("licenseNo") as string;
-
-  if (!name || !email || !password || !role) {
-    return { success: false, error: "All fields are required!" };
-  }
-
-  try {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) return { success: false, error: "Email already exists!" };
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    const shortRole = role.substring(0, 3).toUpperCase();
-    const randomCode = Math.floor(1000 + Math.random() * 9000);
-    const publicId = `${shortRole}-${randomCode}`;
-
-    await prisma.user.create({
-      data: { name, email, password: hashedPassword, role: role as any, publicId, licenseNo: licenseNo || null },
-    });
-
-    return { success: true, message: "Account created successfully!" };
-  } catch (error) {
-    return { success: false, error: "Registration failed." };
-  }
-}
-
-// ✅ OPTIMIZED LOGIN ACTION
 export async function loginAction(formData: FormData): Promise<AuthResponse> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
   try {
-    /** * ⚡ অপ্টিমাইজেশন: সরাসরি signIn কল করুন। 
-     * আপনার lib/auth.ts এর authorize ফাংশন ইতিমধ্যেই ডাটাবেসে ইউজার চেক করছে।
-     * এখানে আলাদা করে prisma.user.findUnique করার প্রয়োজন নেই।
-     */
+    // ১. প্রথমে ডাটাবেস থেকে শুধু ইউজারের রোলটা দেখে নিন
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { role: true } 
+    });
+
+    if (!user) return { success: false, error: "User not found!" };
+
+    // ২. রোল অনুযায়ী সঠিক পাথ (Redirect Path) তৈরি করুন
+    let redirectUrl = "/dashboard";
+    if (user.role === "MANUFACTURER") redirectUrl = "/dashboard/manufacturer";
+    else if (user.role === "DISTRIBUTOR") redirectUrl = "/dashboard/distributor";
+    else if (user.role === "RETAILER") redirectUrl = "/dashboard/retailer";
+
+    // ৩. NextAuth এর signIn কল করুন
+    // redirectTo দিলে NextAuth নিজে থেকেই রিডাইরেক্ট করার চেষ্টা করবে
     await signIn("credentials", {
       email,
       password,
-      redirect: false, // ব্রাউজার লেভেলে রিডাইরেক্ট কন্ট্রোল করতে এটি false রাখুন
+      redirectTo: redirectUrl, 
+      redirect: false, // আমরা ক্লায়েন্ট সাইড থেকে router.push দিয়ে হ্যান্ডেল করব
     });
-
-    // সেশন থেকে রোল নিয়ে ড্যাশবোর্ড পাথ ঠিক করা
-    const session = await auth();
-    const userRole = (session?.user as any)?.role;
-
-    let redirectUrl = "/dashboard";
-    if (userRole === "MANUFACTURER") redirectUrl = "/dashboard/manufacturer";
-    else if (userRole === "DISTRIBUTOR") redirectUrl = "/dashboard/distributor";
-    else if (userRole === "RETAILER") redirectUrl = "/dashboard/retailer";
 
     return { success: true, redirectUrl }; 
 
   } catch (error) {
     if (error instanceof AuthError) {
-      switch (error.type) {
-        case "CredentialsSignin":
-          return { success: false, error: "Invalid credentials!" };
-        default:
-          return { success: false, error: "Something went wrong!" };
-      }
+      return { success: false, error: "Invalid email or password!" };
     }
-    return { success: false, error: "Authentication failed." };
+    // রিডাইরেক্ট ঠিকমতো কাজ করার জন্য এটি প্রয়োজন
+    if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
+        throw error;
+    }
+    return { success: false, error: "Something went wrong!" };
   }
 }
-
-// ✅ LOGOUT ACTION
+// lib/actions/auth-actions.ts ফাইলের একদম নিচে এটি যোগ করুন
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
 }
