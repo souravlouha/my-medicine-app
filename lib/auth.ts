@@ -6,9 +6,10 @@ import bcrypt from "bcryptjs"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" }, // আমরা JWT ব্যবহার করছি যাতে Edge-এ সমস্যা না হয়
-  secret: process.env.AUTH_SECRET, // এটি নিশ্চিত করে যে সিক্রেট ঠিকঠাক পাচ্ছে
-  
+  session: { strategy: "jwt" },
+  trustHost: true, // ✅ ফিক্স: এটি Vercel-এ কুকি সমস্যা সমাধান করে
+  secret: process.env.AUTH_SECRET, // এনভায়রনমেন্ট ভেরিয়েবল থেকে সিক্রেট নেওয়া হচ্ছে
+
   providers: [
     Credentials({
       name: "credentials",
@@ -40,21 +41,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
-        token.role = (user as any).role; // রোল টোকেনে ঢুকানো হচ্ছে
+        token.role = (user as any).role; // রোল টোকেনে সেভ হচ্ছে
       }
       return token;
     },
     async session({ session, token }) {
       if (token.sub && session.user) {
         session.user.id = token.sub;
-        (session.user as any).role = token.role; // সেশনে রোল সেট করা হচ্ছে
+        // ✅ ফিক্স: রোল কেস-সেন্সিটিভ ইস্যু এড়াতে বড় হাতে কনভার্ট করা হচ্ছে
+        (session.user as any).role = (token.role as string || "").toUpperCase();
       }
       return session;
     }
   },
 })
 
-// হেল্পার ফাংশন
 export const currentUser = async () => {
   const session = await auth();
   return session?.user;
