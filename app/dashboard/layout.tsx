@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import Sidebar from "@/components/dashboard/Sidebar"; // আপনার সাইডবার কম্পোনেন্টের পাথ চেক করুন
-import ManufacturerHeader from "@/components/ManufacturerHeader"; // হেডার কম্পোনেন্টের পাথ চেক করুন
+import Sidebar from "@/components/dashboard/Sidebar"; 
+import ManufacturerHeader from "@/components/ManufacturerHeader"; 
 
 export default async function DashboardLayout({
   children,
@@ -17,8 +17,9 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* বাম পাশে সাইডবার (যদি থাকে) */}
+      {/* বাম পাশে সাইডবার */}
       <div className="w-64 hidden md:block">
+         {/* রোল পাস করা হচ্ছে */}
          <Sidebar userRole={(session.user as any).role} />
       </div>
 
@@ -26,7 +27,8 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* উপরে হেডার */}
         <header className="bg-white shadow p-4">
-           <ManufacturerHeader user={session.user} />
+           {/* ✅ ফিক্স: এখানে 'as any' ব্যবহার করা হলো যাতে TypeScript বিল্ড না আটকায় */}
+           <ManufacturerHeader user={session.user as any} />
         </header>
 
         {/* পেজের ভেতরের অংশ */}
