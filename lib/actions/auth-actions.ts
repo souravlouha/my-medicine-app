@@ -1,17 +1,55 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { signIn, auth } from "@/lib/auth";
+import bcrypt from "bcryptjs";
+import { signIn, signOut, auth } from "@/lib/auth"; 
 import { AuthError } from "next-auth";
 
-// ... আগের ইন্টারফেস এবং রেজিস্টার লজিক ...
+// রিটার্ন টাইপ ইন্টারফেস
+interface AuthResponse {
+  success: boolean;
+  error?: string;
+  redirectUrl?: string; 
+}
 
+// ✅ 1. REGISTER ACTION (এটি মিসিং ছিল)
+export async function registerAction(formData: FormData) {
+  const name = formData.get("name") as string;
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const role = formData.get("role") as string;
+  const licenseNo = formData.get("licenseNo") as string;
+
+  if (!name || !email || !password || !role) {
+    return { success: false, error: "All fields are required!" };
+  }
+
+  try {
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) return { success: false, error: "Email already exists!" };
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const shortRole = role.substring(0, 3).toUpperCase();
+    const randomCode = Math.floor(1000 + Math.random() * 9000);
+    const publicId = `${shortRole}-${randomCode}`;
+
+    await prisma.user.create({
+      data: { name, email, password: hashedPassword, role: role as any, publicId, licenseNo: licenseNo || null },
+    });
+
+    return { success: true, message: "Account created successfully!" };
+  } catch (error) {
+    return { success: false, error: "Registration failed." };
+  }
+}
+
+// ✅ 2. LOGIN ACTION
 export async function loginAction(formData: FormData): Promise<AuthResponse> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
   try {
-    // ১. প্রথমে ডাটাবেস থেকে শুধু ইউজারের রোলটা দেখে নিন
     const user = await prisma.user.findUnique({
       where: { email },
       select: { role: true } 
@@ -19,35 +57,30 @@ export async function loginAction(formData: FormData): Promise<AuthResponse> {
 
     if (!user) return { success: false, error: "User not found!" };
 
-    // ২. রোল অনুযায়ী সঠিক পাথ (Redirect Path) তৈরি করুন
     let redirectUrl = "/dashboard";
     if (user.role === "MANUFACTURER") redirectUrl = "/dashboard/manufacturer";
     else if (user.role === "DISTRIBUTOR") redirectUrl = "/dashboard/distributor";
     else if (user.role === "RETAILER") redirectUrl = "/dashboard/retailer";
 
-    // ৩. NextAuth এর signIn কল করুন
-    // redirectTo দিলে NextAuth নিজে থেকেই রিডাইরেক্ট করার চেষ্টা করবে
     await signIn("credentials", {
       email,
       password,
       redirectTo: redirectUrl, 
-      redirect: false, // আমরা ক্লায়েন্ট সাইড থেকে router.push দিয়ে হ্যান্ডেল করব
+      redirect: false, 
     });
 
     return { success: true, redirectUrl }; 
 
   } catch (error) {
     if (error instanceof AuthError) {
-      return { success: false, error: "Invalid email or password!" };
+      if (error.type === "CredentialsSignin") return { success: false, error: "Invalid credentials!" };
+      return { success: false, error: "Something went wrong!" };
     }
-    // রিডাইরেক্ট ঠিকমতো কাজ করার জন্য এটি প্রয়োজন
-    if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
-        throw error;
-    }
-    return { success: false, error: "Something went wrong!" };
+    throw error; 
   }
 }
-// lib/actions/auth-actions.ts ফাইলের একদম নিচে এটি যোগ করুন
+
+// ✅ 3. LOGOUT ACTION (এটিও মিসিং ছিল)
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
 }
