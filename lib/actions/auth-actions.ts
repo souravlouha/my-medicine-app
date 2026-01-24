@@ -2,17 +2,16 @@
 
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { signIn, signOut } from "@/lib/auth"; // ✅ আমাদের বানানো auth ইম্পোর্ট
+import { signIn, signOut, auth } from "@/lib/auth"; // ✅ auth ও ইম্পোর্ট করুন
 import { AuthError } from "next-auth";
 
-// রিটার্ন টাইপ ইন্টারফেস ডিফাইন করুন
 interface AuthResponse {
   success: boolean;
   error?: string;
   redirectUrl?: string; 
 }
 
-// ✅ REGISTER ACTION (এটা আগের মতোই ঠিক আছে)
+// ✅ REGISTER ACTION
 export async function registerAction(formData: FormData) {
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
@@ -28,7 +27,6 @@ export async function registerAction(formData: FormData) {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return { success: false, error: "Email already exists!" };
 
-    // পাসওয়ার্ড হ্যাস করা হচ্ছে
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const shortRole = role.substring(0, 3).toUpperCase();
@@ -45,33 +43,32 @@ export async function registerAction(formData: FormData) {
   }
 }
 
-// ✅ LOGIN ACTION (সফল হলে redirectUrl রিটার্ন করবে)
+// ✅ OPTIMIZED LOGIN ACTION
 export async function loginAction(formData: FormData): Promise<AuthResponse> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
   try {
-    // ১. ইউজার খুঁজে বের করা
-    const user = await prisma.user.findUnique({ where: { email } });
-    
-    if (!user) {
-        return { success: false, error: "User not found" };
-    }
-
-    // ২. রোল অনুযায়ী রিডাইরেক্ট ঠিক করা
-    let redirectUrl = "/dashboard";
-    if (user.role === "MANUFACTURER") redirectUrl = "/dashboard/manufacturer";
-    else if (user.role === "DISTRIBUTOR") redirectUrl = "/dashboard/distributor";
-    else if (user.role === "RETAILER") redirectUrl = "/dashboard/retailer";
-
-    // ৩. NextAuth এর signIn ফাংশন কল করা
+    /** * ⚡ অপ্টিমাইজেশন: সরাসরি signIn কল করুন। 
+     * আপনার lib/auth.ts এর authorize ফাংশন ইতিমধ্যেই ডাটাবেসে ইউজার চেক করছে।
+     * এখানে আলাদা করে prisma.user.findUnique করার প্রয়োজন নেই।
+     */
     await signIn("credentials", {
       email,
       password,
-      redirectTo: redirectUrl, 
+      redirect: false, // ব্রাউজার লেভেলে রিডাইরেক্ট কন্ট্রোল করতে এটি false রাখুন
     });
 
-    return { success: true, redirectUrl }; // ✅ সফল হলে URL ফেরত পাঠানো হচ্ছে
+    // সেশন থেকে রোল নিয়ে ড্যাশবোর্ড পাথ ঠিক করা
+    const session = await auth();
+    const userRole = (session?.user as any)?.role;
+
+    let redirectUrl = "/dashboard";
+    if (userRole === "MANUFACTURER") redirectUrl = "/dashboard/manufacturer";
+    else if (userRole === "DISTRIBUTOR") redirectUrl = "/dashboard/distributor";
+    else if (userRole === "RETAILER") redirectUrl = "/dashboard/retailer";
+
+    return { success: true, redirectUrl }; 
 
   } catch (error) {
     if (error instanceof AuthError) {
@@ -82,31 +79,11 @@ export async function loginAction(formData: FormData): Promise<AuthResponse> {
           return { success: false, error: "Something went wrong!" };
       }
     }
-    throw error; // রিডাইরেক্ট এর জন্য এরর থ্রো করা জরুরি
+    return { success: false, error: "Authentication failed." };
   }
 }
 
 // ✅ LOGOUT ACTION
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
-}
-
-// (অতিরিক্ত ফাংশন যা আপনি রাখতে চেয়েছেন)
-export async function loginUser(formData: FormData): Promise<AuthResponse> {
-  // আপনার লগইন লজিক...
-  const success = true; // ডামি লজিক
-  const user = { role: "MANUFACTURER" }; // ডামি লজিক
-  
-  if (success) {
-    const dashboardPath = user.role === "MANUFACTURER" 
-      ? "/dashboard/manufacturer" 
-      : "/dashboard/retailer";
-
-    return { 
-      success: true, 
-      redirectUrl: dashboardPath 
-    };
-  }
-  
-  return { success: false, error: "Invalid credentials" };
 }
