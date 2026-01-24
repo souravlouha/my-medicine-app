@@ -1,22 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth"; // ✅ ফিক্স: auth ইমপোর্ট করা হলো
+import { auth } from "@/lib/auth"; // ✅ নতুন অথেন্টিকেশন সিস্টেম
 import { SalesTrendChart, InventoryPieChart, TopProductsChart, WeeklySalesChart } from "@/components/dashboard/DashboardCharts"; 
 import { AlertTriangle, TrendingUp, Package, DollarSign, Users, Activity, Clock, Truck } from "lucide-react";
-import ManufacturerHeader from "@/components/dashboard/ManufacturerHeader";
 
 export default async function ManufacturerDashboard() {
-  // ✅ ফিক্স: কুকির বদলে সেশন থেকে আইডি নেওয়া হচ্ছে
+  // ✅ ফিক্স ১: কুকির বদলে সেশন ব্যবহার (লগআউট সমস্যা সমাধান)
   const session = await auth();
   const userId = session?.user?.id;
 
-  // যদি ইউজার না থাকে, লগইনে পাঠাও
   if (!userId) {
     redirect("/login");
   }
 
   // =========================================================
-  // 1. DATA FETCHING (বাকি সব কোড ঠিক আছে)
+  // 1. DATA FETCHING
   // =========================================================
   const [user, inventory, shipments, recalls, batches, topPartners] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
@@ -125,8 +123,7 @@ export default async function ManufacturerDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-10">
       
-      {/* ✅ ফিক্স: as any দিয়ে টাইপ এরর এড়ানো হলো */}
-      <ManufacturerHeader user={user as any} />
+      {/* ✅ ফিক্স ২: হেডার এখান থেকে সরানো হয়েছে (Layout এ আছে তাই) */}
 
       {/* 1. KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

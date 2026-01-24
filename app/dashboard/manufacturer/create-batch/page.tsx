@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ কুকির বদলে auth ইম্পোর্ট
 import { redirect } from "next/navigation";
 import CreateBatchForm from "./CreateBatchForm";
 // 👇 নতুন চার্ট ও আইকন ইম্পোর্ট
@@ -7,8 +7,9 @@ import { ProductionTrendChart } from "@/components/dashboard/DashboardCharts";
 import { History, BarChart3, PackageCheck } from "lucide-react";
 
 export default async function CreateBatchPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: কুকি স্টোর বাদ দিয়ে সেশন চেক
+  const session = await auth();
+  const userId = session?.user?.id;
 
   if (!userId) redirect("/login");
 
@@ -83,56 +84,56 @@ export default async function CreateBatchPage() {
          </h3>
 
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* 1. Production Trend Chart */}
-            <div className="bg-white p-1 rounded-2xl shadow-sm border border-gray-100 h-full">
-               <ProductionTrendChart data={productionChartData} />
-            </div>
+           
+           {/* 1. Production Trend Chart */}
+           <div className="bg-white p-1 rounded-2xl shadow-sm border border-gray-100 h-full">
+              <ProductionTrendChart data={productionChartData} />
+           </div>
 
-            {/* 2. Stats & Recent History */}
-            <div className="space-y-6">
-               
-               {/* Quick Stat Card */}
-               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                   <div>
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">This Month Output</p>
-                      <h3 className="text-3xl font-black text-gray-800 mt-1">
-                         {(thisMonthTotal._sum.totalQuantity || 0).toLocaleString()} 
-                         <span className="text-sm font-medium text-gray-500 ml-1">Strips</span>
-                      </h3>
-                   </div>
-                   <div className="p-4 bg-orange-50 text-orange-600 rounded-xl">
-                      <PackageCheck size={28} />
-                   </div>
-               </div>
+           {/* 2. Stats & Recent History */}
+           <div className="space-y-6">
+              
+              {/* Quick Stat Card */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                  <div>
+                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">This Month Output</p>
+                     <h3 className="text-3xl font-black text-gray-800 mt-1">
+                        {(thisMonthTotal._sum.totalQuantity || 0).toLocaleString()} 
+                        <span className="text-sm font-medium text-gray-500 ml-1">Strips</span>
+                     </h3>
+                  </div>
+                  <div className="p-4 bg-orange-50 text-orange-600 rounded-xl">
+                     <PackageCheck size={28} />
+                  </div>
+              </div>
 
-               {/* Recent Batch List */}
-               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                   <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
-                      <History size={16} className="text-gray-500" />
-                      <h3 className="font-bold text-gray-700 text-sm">Recently Created Batches</h3>
-                   </div>
-                   <div className="divide-y divide-gray-50 max-h-[220px] overflow-y-auto">
-                      {recentBatches.map((batch) => (
-                         <div key={batch.id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition">
-                            <div>
-                               <p className="text-sm font-bold text-gray-800">{batch.product.name}</p>
-                               <p className="text-[10px] text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">{batch.batchNumber}</p>
-                            </div>
-                            <div className="text-right">
-                               <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full border border-green-200">
-                                  {batch.totalQuantity} Qty
-                               </span>
-                               <p className="text-[10px] text-gray-400 mt-1">{new Date(batch.createdAt).toLocaleDateString()}</p>
-                            </div>
-                         </div>
-                      ))}
-                      {recentBatches.length === 0 && <p className="p-6 text-center text-xs text-gray-400">No production history found.</p>}
-                   </div>
-               </div>
+              {/* Recent Batch List */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+                     <History size={16} className="text-gray-500" />
+                     <h3 className="font-bold text-gray-700 text-sm">Recently Created Batches</h3>
+                  </div>
+                  <div className="divide-y divide-gray-50 max-h-[220px] overflow-y-auto">
+                     {recentBatches.map((batch) => (
+                        <div key={batch.id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition">
+                           <div>
+                              <p className="text-sm font-bold text-gray-800">{batch.product.name}</p>
+                              <p className="text-[10px] text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">{batch.batchNumber}</p>
+                           </div>
+                           <div className="text-right">
+                              <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full border border-green-200">
+                                 {batch.totalQuantity} Qty
+                              </span>
+                              <p className="text-[10px] text-gray-400 mt-1">{new Date(batch.createdAt).toLocaleDateString()}</p>
+                           </div>
+                        </div>
+                     ))}
+                     {recentBatches.length === 0 && <p className="p-6 text-center text-xs text-gray-400">No production history found.</p>}
+                  </div>
+              </div>
 
-            </div>
-         </div>
+           </div>
+        </div>
       </div>
 
     </div>
