@@ -1,31 +1,39 @@
-import Sidebar from "@/components/dashboard/Sidebar";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import Sidebar from "@/components/dashboard/Sidebar"; // আপনার সাইডবার কম্পোনেন্টের পাথ চেক করুন
+import ManufacturerHeader from "@/components/ManufacturerHeader"; // হেডার কম্পোনেন্টের পাথ চেক করুন
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = await cookies();
-  const userRole = cookieStore.get("userRole")?.value;
+  const session = await auth();
 
-  // যদি রোল না থাকে (লগইন করা না থাকে), লগইন পেজে পাঠাবে
-  if (!userRole) {
+  // ১. ডবল চেক: যদি সেশন না থাকে, লগইনে পাঠাও
+  if (!session?.user) {
     redirect("/login");
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      
-      {/* 👈 বাম পাশে ফিক্সড সাইডবার */}
-      <Sidebar userRole={userRole} />
+    <div className="flex h-screen bg-gray-100">
+      {/* বাম পাশে সাইডবার (যদি থাকে) */}
+      <div className="w-64 hidden md:block">
+         <Sidebar userRole={(session.user as any).role} />
+      </div>
 
-      {/* 👉 ডান পাশে ডাইনামিক কন্টেন্ট (Manufacturer/Distributor Dashboard) */}
-      <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen">
-        {children}
-      </main>
-      
+      {/* মেইন কন্টেন্ট */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* উপরে হেডার */}
+        <header className="bg-white shadow p-4">
+           <ManufacturerHeader user={session.user} />
+        </header>
+
+        {/* পেজের ভেতরের অংশ */}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
