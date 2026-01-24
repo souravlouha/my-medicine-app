@@ -1,13 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ নতুন ইম্পোর্ট
 import { redirect } from "next/navigation";
 import { ShoppingBag, Clock } from "lucide-react";
-// ✅ নতুন কম্পোনেন্ট ইম্পোর্ট
 import OrderActions from "./OrderActions"; 
 
 export default async function ManufacturerOrdersPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: কুকির বদলে সেশন ব্যবহার করা হলো
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) redirect("/login");
 
   // ম্যানুফ্যাকচারারের কাছে আসা অর্ডারগুলো ফেচ করা
@@ -49,7 +50,6 @@ export default async function ManufacturerOrdersPage() {
                       <div className="flex items-center gap-3">
                          <h3 className="text-xl font-black text-gray-800">#{order.orderId}</h3>
                          {/* Status Badge */}
-                         {/* ✅ FIX: REJECTED এর বদলে CANCELLED ব্যবহার করা হলো */}
                          <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 
                             ${order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 
                               order.status === 'APPROVED' ? 'bg-blue-100 text-blue-800' :

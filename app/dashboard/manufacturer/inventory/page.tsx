@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ নতুন ইম্পোর্ট (cookies বাদ)
 import { redirect } from "next/navigation";
 import { Search, Filter, AlertTriangle, Boxes, Calendar, PackageCheck, ArrowRight } from "lucide-react";
 
 export default async function ManufacturerInventoryPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: কুকির বদলে সেশন ব্যবহার করা হলো
+  const session = await auth();
+  const userId = session?.user?.id;
+
   if (!userId) redirect("/login");
 
   // ১. ব্যাচ এবং তার সাথে শিপমেন্টের তথ্য আনা (Live Stock হিসাব করার জন্য)
@@ -24,7 +26,7 @@ export default async function ManufacturerInventoryPage() {
 
   // ২. লাইভ স্টক ক্যালকুলেশন
   const inventoryData = batches.map((batch) => {
-    // কতো পিস মাল শিপমেন্ট করা হয়েছে (শুধুমাত্র যেগুলো ক্যানসেল হয়নি)
+    // কতো পিস মাল শিপমেন্ট করা হয়েছে (শুধুমাত্র যেগুলো ক্যানসেল হয়নি)
     const shippedQuantity = batch.shipmentItems.reduce((acc, item) => {
       if (item.shipment.status !== 'CANCELLED' && item.shipment.status !== 'REJECTED') {
         return acc + item.quantity;
@@ -37,7 +39,7 @@ export default async function ManufacturerInventoryPage() {
 
     return {
       ...batch,
-      liveStock: liveStock > 0 ? liveStock : 0, // নেগেটিভ এড়াতে
+      liveStock: liveStock > 0 ? liveStock : 0, // নেগেটিভ এড়াতে
       shippedQuantity
     };
   }).filter(b => b.liveStock > 0); // অপশনাল: যদি শুধু স্টক থাকা আইটেম দেখতে চান
