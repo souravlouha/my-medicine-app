@@ -4,11 +4,11 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { authConfig } from "./auth.config"; // 👈 নতুন কনফিগ ইমপোর্ট করছি
+import { authConfig } from "./auth.config"; 
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...authConfig, // আগের কনফিগ যোগ করা হলো
-  adapter: PrismaAdapter(prisma), // এখানে প্রিজমা অ্যাডাপ্টার যোগ করলাম
+  ...authConfig, 
+  adapter: PrismaAdapter(prisma), 
   secret: process.env.AUTH_SECRET,
   trustHost: true,
   providers: [
@@ -38,3 +38,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
 });
+
+// ✅ এই অংশটি মিসিং ছিল, তাই এরর আসছিল। এটি যোগ করে দিন।
+export const currentUser = async () => {
+  const session = await auth();
+  return session?.user;
+};
