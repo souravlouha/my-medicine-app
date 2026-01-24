@@ -1,5 +1,5 @@
 import { prisma as db } from "@/lib/prisma"; // 👈 ফিক্স: এখানেও prisma.ts ব্যবহার করতে হবে
-import { auth } from "@/auth"; // যদি এটাতেও এরর দেয়, তবে "../../../auth" দিয়ে ট্রাই করবেন
+import { auth } from "@/lib/auth"; // যদি এটাতেও এরর দেয়, তবে "../../../auth" দিয়ে ট্রাই করবেন
 import { formatDate } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity } from "lucide-react";
