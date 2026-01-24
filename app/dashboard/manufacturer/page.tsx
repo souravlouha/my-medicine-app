@@ -1,18 +1,22 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth"; // ✅ ফিক্স: auth ইমপোর্ট করা হলো
 import { SalesTrendChart, InventoryPieChart, TopProductsChart, WeeklySalesChart } from "@/components/dashboard/DashboardCharts"; 
-import { AlertTriangle, TrendingUp, Package, DollarSign, Users, Activity, Clock, Truck, FileText } from "lucide-react";
-import Link from "next/link";
+import { AlertTriangle, TrendingUp, Package, DollarSign, Users, Activity, Clock, Truck } from "lucide-react";
 import ManufacturerHeader from "@/components/dashboard/ManufacturerHeader";
 
 export default async function ManufacturerDashboard() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) redirect("/login");
+  // ✅ ফিক্স: কুকির বদলে সেশন থেকে আইডি নেওয়া হচ্ছে
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  // যদি ইউজার না থাকে, লগইনে পাঠাও
+  if (!userId) {
+    redirect("/login");
+  }
 
   // =========================================================
-  // 1. DATA FETCHING
+  // 1. DATA FETCHING (বাকি সব কোড ঠিক আছে)
   // =========================================================
   const [user, inventory, shipments, recalls, batches, topPartners] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
@@ -24,7 +28,7 @@ export default async function ManufacturerDashboard() {
 
     prisma.shipment.findMany({
       where: { manufacturerId: userId },
-      orderBy: { createdAt: 'desc' }, // Latest first for activity log
+      orderBy: { createdAt: 'desc' }, 
       include: { items: { include: { batch: { include: { product: true } } } } }
     }),
 
@@ -48,7 +52,7 @@ export default async function ManufacturerDashboard() {
     })
   ]);
 
-  if (!user) return <div>User not found</div>;
+  if (!user) return <div className="p-10 text-center">User not found</div>;
 
   // =========================================================
   // 2. DATA PROCESSING
@@ -65,7 +69,6 @@ export default async function ManufacturerDashboard() {
   
   shipments.forEach(s => {
     const d = new Date(s.createdAt);
-    // শুধু চলতি সপ্তাহের ডাটা নিচ্ছি (সিম্পল লজিক)
     if(new Date().getTime() - d.getTime() < 7 * 24 * 60 * 60 * 1000) {
        weeklyDataMap[d.getDay()].sales += s.totalAmount;
     }
@@ -102,12 +105,12 @@ export default async function ManufacturerDashboard() {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value).slice(0, 5);
 
-  // F. 🆕 RECENT ACTIVITY LOG (Merged List)
+  // F. RECENT ACTIVITY LOG
   const activities = [
     ...shipments.map(s => ({ type: 'SHIPMENT', date: s.createdAt, title: `Shipment Sent`, desc: `ID: ${s.shipmentId} - ₹${s.totalAmount}` })),
     ...batches.map(b => ({ type: 'BATCH', date: b.createdAt, title: `Batch Created`, desc: `${b.product.name} (${b.batchNumber})` })),
     ...recalls.map(r => ({ type: 'RECALL', date: r.createdAt, title: `Recall Issued`, desc: `Reason: ${r.reason}` }))
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6); // Top 6 actions
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
 
   // G. Alerts
   const lowStockItems = inventory.filter(item => item.currentStock < 50);
@@ -122,7 +125,8 @@ export default async function ManufacturerDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-10">
       
-      <ManufacturerHeader user={user} />
+      {/* ✅ ফিক্স: as any দিয়ে টাইপ এরর এড়ানো হলো */}
+      <ManufacturerHeader user={user as any} />
 
       {/* 1. KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -157,13 +161,13 @@ export default async function ManufacturerDashboard() {
         </div>
       </div>
 
-      {/* 2. Main Charts (Area + Weekly Bar) */}
+      {/* 2. Main Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
          <SalesTrendChart data={chartData} />
          <WeeklySalesChart data={weeklyDataMap} />
       </div>
 
-      {/* 3. Secondary Charts (Top Products + Pie) */}
+      {/* 3. Secondary Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
          <div className="lg:col-span-2">
             <TopProductsChart data={topProductsData} />
@@ -173,10 +177,10 @@ export default async function ManufacturerDashboard() {
          </div>
       </div>
 
-      {/* 4. Bottom Section: Activity Log & Alerts */}
+      {/* 4. Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
          
-         {/* 🆕 RECENT ACTIVITY LOG SECTION */}
+         {/* Activity Log */}
          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                <h3 className="font-bold text-gray-800 flex items-center gap-2"><Clock size={18} /> Recent Activity Log</h3>
@@ -205,9 +209,8 @@ export default async function ManufacturerDashboard() {
             </div>
          </div>
 
-         {/* Alerts & Partners Column */}
+         {/* Alerts & Partners */}
          <div className="space-y-8">
-             {/* Alerts */}
              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 bg-red-50/50 flex justify-between items-center">
                    <h3 className="font-bold text-gray-800 flex items-center gap-2"><Activity size={18} className="text-red-500"/> Action Needed</h3>
@@ -237,7 +240,6 @@ export default async function ManufacturerDashboard() {
                 </div>
              </div>
 
-             {/* Top Distributors */}
              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center">
                    <h3 className="font-bold text-gray-800">🏆 Top Partners</h3>
