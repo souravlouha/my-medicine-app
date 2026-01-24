@@ -1,4 +1,4 @@
-import { currentUser } from "@/lib/auth";
+import { currentUser } from "@/lib/auth"; // ✅ currentUser ইমপোর্ট করুন
 import { prisma as db } from "@/lib/prisma"; 
 import { formatCurrency } from "@/lib/formatters";
 import { ActivityLog } from "@/components/dashboard/activity-log";
@@ -6,21 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, CreditCard, TrendingUp, Store, ShoppingCart, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { redirect } from "next/navigation"; // ✅ রিডাইরেক্টের জন্য প্রয়োজন
 
 export default async function RetailerDashboard() {
-  // ✅ FIX: 'as any' ব্যবহার করা হলো যাতে shopName এবং licenseNumber অ্যাক্সেস করা যায়
   const user = await currentUser() as any;
 
-  // ডাটাবেস থেকে ডাটা আনা (সেফটি চেক সহ)
+  // ✅ ইউজার না থাকলে লগইন পেজে পাঠিয়ে দিন
+  if (!user) {
+    redirect("/auth/login");
+  }
+
+  // ডাটাবেস থেকে ডাটা আনা (Prisma ব্যবহার করে)
   const salesCount = await db.order.count({ 
-    where: { senderId: user?.id } 
+    where: { senderId: user.id } 
   }).catch(() => 0);
   
   const inventoryCount = await db.inventory.count({
-    where: { userId: user?.id }
+    where: { userId: user.id }
   }).catch(() => 0);
 
-  // ডামি ডাটা
+  // ডামি ডাটা (এগুলো পরে ডাইনামিক করতে পারবেন)
   const totalRevenue = 0; 
   const totalProfit = 0;
   const assetValue = 0;
@@ -46,8 +51,8 @@ export default async function RetailerDashboard() {
               License: {user?.licenseNumber || "Pending"}
             </p>
           </div>
-          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border border-blue-200">
-             {user?.name?.[0]?.toUpperCase() || "R"}
+          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border border-blue-200 uppercase">
+             {user?.name?.[0] || "R"}
           </div>
           <Link href="/dashboard/retailer/pos">
             <Button size="sm" className="ml-2 bg-blue-600 hover:bg-blue-700 text-white">

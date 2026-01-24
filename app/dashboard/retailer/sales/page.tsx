@@ -1,17 +1,21 @@
-import { prisma } from "@/lib/prisma"; // ✅ Fix: db -> prisma
+import { prisma } from "@/lib/prisma"; 
 import { currentUser } from "@/lib/auth"; 
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { DollarSign, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { redirect } from "next/navigation"; // ✅ যোগ করুন
 
 export default async function SalesHistoryPage() {
   const user = await currentUser();
 
-  if (!user) return <div>Not authorized</div>;
+  // ✅ ইউজার না থাকলে লগইন পেজে পাঠিয়ে দিন
+  if (!user) {
+    redirect("/auth/login");
+  }
 
-  // ডাটাবেস থেকে সেলস হিস্ট্রি আনা (Prisma)
-  const sales = await prisma.order.findMany({ // ✅ Fix
+  // ডাটাবেস থেকে সেলস হিস্ট্রি আনা
+  const sales = await prisma.order.findMany({ 
     where: { senderId: user.id },
     orderBy: { createdAt: 'desc' },
     include: { items: true }
@@ -39,20 +43,20 @@ export default async function SalesHistoryPage() {
          </Card>
       </div>
 
-      <div className="rounded-md border bg-white dark:bg-slate-900 p-4">
+      <div className="rounded-md border bg-white dark:bg-slate-900 p-4 shadow-sm">
          {sales.length === 0 ? (
              <div className="text-center py-10 text-muted-foreground">No sales found.</div>
          ) : (
              <div className="space-y-4">
                  {sales.map((sale) => (
-                     <div key={sale.id} className="flex justify-between border-b pb-4 last:border-0">
+                     <div key={sale.id} className="flex justify-between border-b pb-4 last:border-0 hover:bg-slate-50/50 p-2 rounded-lg transition">
                          <div>
-                             <p className="font-medium">Order #{sale.orderId}</p>
+                             <p className="font-medium text-slate-900 dark:text-white">Order #{sale.orderId}</p>
                              <p className="text-xs text-muted-foreground">{formatDate(sale.createdAt)}</p>
                          </div>
                          <div className="text-right">
                              <p className="font-bold text-green-600">{formatCurrency(sale.totalAmount)}</p>
-                             <p className="text-xs">{sale.status}</p>
+                             <p className="text-[10px] uppercase font-bold text-slate-400">{sale.status}</p>
                          </div>
                      </div>
                  ))}
