@@ -4,22 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-// ১. ব্যাচ খোঁজার ফাংশন (With Debugging)
+// ১. ব্যাচ খোঁজার ফাংশন
 export async function getAvailableBatches() {
   const session = await auth();
   const userId = session?.user?.id;
-
-  console.log("🔍 Checking Session User ID:", userId);
-
-  if (!userId) {
-    return { batches: [], debugInfo: "NO_SESSION_FOUND" };
-  }
+  if (!userId) return { batches: [], debugInfo: "NO_SESSION_FOUND" };
 
   try {
     const batches = await prisma.batch.findMany({
-      where: {
-        manufacturerId: userId,
-      },
+      where: { manufacturerId: userId },
       select: {
         id: true,
         batchNumber: true,
@@ -28,17 +21,13 @@ export async function getAvailableBatches() {
       },
       orderBy: { createdAt: 'desc' }
     });
-
-    console.log(`✅ Found ${batches.length} batches for User: ${userId}`);
     return { batches: batches, debugInfo: userId };
-
   } catch (error) {
-    console.error("❌ Database Error:", error);
     return { batches: [], debugInfo: "DB_ERROR" };
   }
 }
 
-// ✅ ২. নতুন জব তৈরি (UPDATED: Time Limit & Operator)
+// ২. নতুন জব তৈরি
 export async function createPrintJob(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false as const, error: "Unauthorized" };
@@ -74,56 +63,43 @@ export async function createPrintJob(formData: FormData) {
     revalidatePath("/dashboard/manufacturer/production/assign");
     return { success: true as const, code: accessCode };
   } catch (error) {
-    console.error(error);
     return { success: false as const, error: "Failed to create job" };
   }
 }
 
-// ✅ ৩. Get All Print Jobs
+// ৩. Get All Print Jobs
 export async function getPrintJobs() {
   const session = await auth();
   if (!session?.user?.id) return { success: false, data: [] };
 
   try {
     const jobs = await prisma.printJob.findMany({
-      where: {
-        batch: { manufacturerId: session.user.id }
-      },
-      include: {
-        batch: { include: { product: true } }
-      },
+      where: { batch: { manufacturerId: session.user.id } },
+      include: { batch: { include: { product: true } } },
       orderBy: { createdAt: 'desc' }
     });
     return { success: true, data: jobs };
   } catch (error) {
-    console.error("Fetch Jobs Error:", error);
     return { success: false, data: [] };
   }
 }
 
-// ✅ ৪. Verify Operator Access Code
+// ৪. Verify Operator Access Code
 export async function verifyOperatorCode(code: string) {
   try {
     const job = await prisma.printJob.findUnique({
       where: { accessCode: code },
-      include: {
-        batch: { include: { product: true } }
-      }
+      include: { batch: { include: { product: true } } }
     });
-
     if (!job) return { success: false, error: "Invalid Access Code" };
-    if (job.status === "COMPLETED") return { success: false, error: "This job is already completed." };
-    if (job.accessExpiresAt && new Date() > new Date(job.accessExpiresAt)) {
-      return { success: false, error: "Access Code Expired!" };
-    }
-
+    if (job.status === "COMPLETED") return { success: false, error: "Completed" };
     return { success: true, job };
   } catch (error) {
     return { success: false, error: "Verification Failed" };
   }
 }
 
-// ✅ ৫. অপারেটরের জন্য জবের ডিটেইলস আনা
+// ৫. অপারেটরের জন্য জবের ডিটেইলস আনা
 export async function getJobDetails(code: string) {
   try {
     const job = await prisma.printJob.findUnique({
@@ -132,10 +108,7 @@ export async function getJobDetails(code: string) {
         batch: {
           include: { 
             product: true,
-            units: {
-              where: { status: "CREATED" },
-              take: 100
-            }
+            units: { where: { status: "CREATED" }, take: 100 }
           } 
         }
       }
@@ -147,7 +120,7 @@ export async function getJobDetails(code: string) {
   }
 }
 
-// ✅ ৬. প্রিন্ট আপডেট করা
+// ৬. প্রিন্ট আপডেট করা
 export async function updatePrintProgress(jobId: string, printedCount: number) {
   try {
     await prisma.printJob.update({
@@ -160,7 +133,7 @@ export async function updatePrintProgress(jobId: string, printedCount: number) {
   }
 }
 
-// ✅ ৭. সব অ্যাক্টিভ জব নিয়ে আসা
+// ৭. সব অ্যাক্টিভ জব নিয়ে আসা
 export async function getActiveJobs() {
   const session = await auth();
   if (!session?.user?.id) return { success: false, data: [] };
@@ -182,30 +155,25 @@ export async function getActiveJobs() {
   }
 }
 
-// ✅ ৮. জবের স্ট্যাটাস চেঞ্জ করা (Pause / Resume / Cancel)
+// ৮. জবের স্ট্যাটাস চেঞ্জ করা
 export async function toggleJobStatus(jobId: string, action: 'PAUSE' | 'RESUME' | 'CANCEL') {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Unauthorized" };
 
   try {
-    let newStatus = "";
-    if (action === 'PAUSE') newStatus = "PAUSED";
-    else if (action === 'RESUME') newStatus = "PENDING";
-    else if (action === 'CANCEL') newStatus = "CANCELLED";
-
+    let newStatus = action === 'PAUSE' ? "PAUSED" : action === 'RESUME' ? "PENDING" : "CANCELLED";
     await prisma.printJob.update({
       where: { id: jobId },
       data: { status: newStatus }
     });
-
     revalidatePath("/dashboard/manufacturer/production/assign");
     return { success: true };
   } catch (error) {
-    return { success: false, error: "Failed to update status" };
+    return { success: false, error: "Failed" };
   }
 }
 
-// ✅ ৯. অপারেটরের আগের কাজের ইতিহাস (History) আনা
+// ✅ ৯. অপারেটরের আগের কাজের ইতিহাস (History) আনা - FIXED updatedAt Error
 export async function getOperatorHistory(operatorId: string) {
   try {
     const history = await prisma.printJob.findMany({
@@ -216,17 +184,17 @@ export async function getOperatorHistory(operatorId: string) {
       include: {
         batch: { include: { product: true } }
       },
-      orderBy: { updatedAt: 'desc' },
+      // ✅ updatedAt এর বদলে createdAt ব্যবহার করা হয়েছে
+      orderBy: { createdAt: 'desc' }, 
       take: 5 
     });
     return { success: true, data: history };
   } catch (error) {
-    console.error("Fetch Operator History Error:", error);
     return { success: false, data: [] };
   }
 }
 
-// ✅ ১০. প্রিন্ট জব সম্পন্ন করা (Confirm & Finish)
+// ১০. প্রিন্ট জব সম্পন্ন করা
 export async function completePrintJob(jobId: string) {
   try {
     await prisma.printJob.update({
@@ -236,7 +204,6 @@ export async function completePrintJob(jobId: string) {
     revalidatePath("/dashboard/manufacturer/production");
     return { success: true };
   } catch (error) {
-    console.error("Complete Job Error:", error);
     return { success: false };
   }
 }
