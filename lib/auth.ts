@@ -7,11 +7,27 @@ import bcrypt from "bcryptjs"
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  
+  // ✅ Vercel সেটিংস
+  trustHost: true, 
   secret: process.env.AUTH_SECRET,
-  debug: true, // Vercel লগে এরর দেখাবে
+  
+  // ✅ কুকি জোরপূর্বক সেট করা
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+      },
+    },
+  },
 
   providers: [
     Credentials({
+      // ... আগের মতো সব কোড ঠিক থাকবে ...
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -19,20 +35,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
-
-        const email = credentials.email as string;
-        const password = credentials.password as string;
-
-        const user = await prisma.user.findUnique({
-          where: { email },
-        });
-
+        const user = await prisma.user.findUnique({ where: { email: credentials.email as string } });
         if (!user) return null;
-
-        const passwordsMatch = await bcrypt.compare(password, user.password);
-        if (!passwordsMatch) return null;
-
-        return user;
+        const match = await bcrypt.compare(credentials.password as string, user.password);
+        if (match) return user;
+        return null;
       },
     }),
   ],
@@ -52,7 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     }
   },
-});
+})
 
 export const currentUser = async () => {
   const session = await auth();
