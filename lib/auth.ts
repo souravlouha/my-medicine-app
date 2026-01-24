@@ -1,15 +1,16 @@
-import NextAuth from "next-auth"
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import { prisma } from "@/lib/prisma"
-import Credentials from "next-auth/providers/credentials"
-import bcrypt from "bcryptjs"
+// lib/auth.ts
+import NextAuth from "next-auth";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "@/lib/prisma";
+import Credentials from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { authConfig } from "./auth.config"; // 👈 নতুন কনফিগ ইমপোর্ট করছি
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
-  trustHost: true, // ✅ ফিক্স: এটি Vercel-এ কুকি সমস্যা সমাধান করে
-  secret: process.env.AUTH_SECRET, // এনভায়রনমেন্ট ভেরিয়েবল থেকে সিক্রেট নেওয়া হচ্ছে
-
+  ...authConfig, // আগের কনফিগ যোগ করা হলো
+  adapter: PrismaAdapter(prisma), // এখানে প্রিজমা অ্যাডাপ্টার যোগ করলাম
+  secret: process.env.AUTH_SECRET,
+  trustHost: true,
   providers: [
     Credentials({
       name: "credentials",
@@ -36,27 +37,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.sub = user.id;
-        token.role = (user as any).role; // রোল টোকেনে সেভ হচ্ছে
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (token.sub && session.user) {
-        session.user.id = token.sub;
-        // ✅ ফিক্স: রোল কেস-সেন্সিটিভ ইস্যু এড়াতে বড় হাতে কনভার্ট করা হচ্ছে
-        (session.user as any).role = (token.role as string || "").toUpperCase();
-      }
-      return session;
-    }
-  },
-})
-
-export const currentUser = async () => {
-  const session = await auth();
-  return session?.user;
-};
+});
