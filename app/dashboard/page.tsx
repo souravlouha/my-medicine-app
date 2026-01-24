@@ -5,26 +5,25 @@ export default async function DashboardCheck() {
   const session = await auth();
   const user = session?.user as any;
 
-  // ১. যদি ইউজার লগইন না থাকে -> লগইন পেজে পাঠাও
   if (!user) {
     redirect("/login");
   }
 
-  // ২. যদি Manufacturer হয় -> Manufacturer ড্যাশবোর্ডে পাঠাও
-  if (user.role === "MANUFACTURER") {
+  // ✅ ফিক্স: রোল যেভাবেই থাকুক, আমরা বড় হাতে কনভার্ট করে চেক করব
+  const role = (user.role || "").toUpperCase();
+
+  if (role === "MANUFACTURER") {
     redirect("/dashboard/manufacturer");
   }
 
-  // ৩. যদি Retailer হয় -> Retailer ড্যাশবোর্ডে পাঠাও
-  if (user.role === "RETAILER") {
+  if (role === "RETAILER") {
     redirect("/dashboard/retailer");
   }
 
-  // ৪. যদি Distributor হয় -> Distributor ড্যাশবোর্ডে পাঠাও
-  if (user.role === "DISTRIBUTOR") {
+  if (role === "DISTRIBUTOR") {
     redirect("/dashboard/distributor");
   }
 
-  // ৫. যদি কিছুই না মেলে
+  // যদি রোল না মেলে
   redirect("/login");
 }

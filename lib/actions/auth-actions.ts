@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { signIn, signOut } from "@/lib/auth";
+import { signIn, signOut } from "@/lib/auth"; 
 import { AuthError } from "next-auth";
 
 // 1. REGISTER ACTION
@@ -22,6 +22,8 @@ export async function registerAction(formData: FormData) {
     if (existingUser) return { success: false, error: "Email already exists!" };
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // পাবলিক আইডি জেনারেশন লজিক
     const shortRole = role.substring(0, 3).toUpperCase();
     const randomCode = Math.floor(1000 + Math.random() * 9000);
     const publicId = `${shortRole}-${randomCode}`;
@@ -36,7 +38,7 @@ export async function registerAction(formData: FormData) {
   }
 }
 
-// 2. LOGIN ACTION (Redirect Logic Included)
+// 2. LOGIN ACTION (Robust Logic for Vercel)
 export async function loginAction(formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
@@ -49,11 +51,14 @@ export async function loginAction(formData: FormData) {
 
     if (!user) return { success: false, error: "User not found!" };
 
-    // রোল অনুযায়ী ইউআরএল ঠিক করা
+    // ✅ ফিক্স: রোল Case-Insensitive করা হলো (যাতে manufecture বা MANUFACTURER সব কাজ করে)
+    const role = (user.role || "").toUpperCase();
+
+    // রোল অনুযায়ী সঠিক রিডাইরেক্ট ইউআরএল সেট করা
     let redirectUrl = "/dashboard";
-    if (user.role === "MANUFACTURER") redirectUrl = "/dashboard/manufacturer";
-    else if (user.role === "DISTRIBUTOR") redirectUrl = "/dashboard/distributor";
-    else if (user.role === "RETAILER") redirectUrl = "/dashboard/retailer";
+    if (role === "MANUFACTURER") redirectUrl = "/dashboard/manufacturer";
+    else if (role === "DISTRIBUTOR") redirectUrl = "/dashboard/distributor";
+    else if (role === "RETAILER") redirectUrl = "/dashboard/retailer";
 
     // ✅ সার্ভার সাইড রিডাইরেক্ট
     await signIn("credentials", {
@@ -67,7 +72,7 @@ export async function loginAction(formData: FormData) {
       if (error.type === "CredentialsSignin") return { success: false, error: "Invalid credentials!" };
       return { success: false, error: "Something went wrong!" };
     }
-    // ⚠️ এই লাইনটি মুছবেন না। Next.js এর রিডাইরেক্ট কাজ করার জন্য এটি মাস্ট।
+    // ⚠️ এই লাইনটি মুছবেন না। Next.js এর সফল রিডাইরেক্ট কাজ করার জন্য এটি মাস্ট।
     throw error; 
   }
 }
