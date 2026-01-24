@@ -7,29 +7,23 @@ export default async function DashboardCheck() {
 
   // ১. লগইন চেক
   if (!user) {
+    // লগইন না থাকলে লগইন পেজে পাঠাবে
     redirect("/login");
   }
 
-  // ২. রোল চেক (Case Insensitive)
+  // ২. রোল চেক
   const role = (user.role || "").toUpperCase();
 
-  if (role === "MANUFACTURER") {
-    redirect("/dashboard/manufacturer");
-  }
+  if (role === "MANUFACTURER") redirect("/dashboard/manufacturer");
+  if (role === "RETAILER") redirect("/dashboard/retailer");
+  if (role === "DISTRIBUTOR") redirect("/dashboard/distributor");
 
-  if (role === "RETAILER") {
-    redirect("/dashboard/retailer");
-  }
-
-  if (role === "DISTRIBUTOR") {
-    redirect("/dashboard/distributor");
-  }
-
+  // ৩. যদি রোল না মেলে
   return (
-    <div className="flex h-screen items-center justify-center">
-      <h1 className="text-xl font-bold text-red-500">
-        Error: No Dashboard Found for Role: {role}
-      </h1>
+    <div className="p-10 text-center">
+      <h1 className="text-xl font-bold text-red-600">Login Successful but No Dashboard Found</h1>
+      <p>Logged in as: {user.email}</p>
+      <p>Detected Role: {role}</p>
     </div>
   );
 }
