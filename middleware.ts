@@ -1,49 +1,28 @@
-// middleware.ts
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { auth } from "@/lib/auth";
+import { NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const { nextUrl } = req;
 
-  // ১. পাবলিক রুট: Verify পেজে সবাই যেতে পারবে
-  if (path.startsWith('/verify')) {
-    return NextResponse.next();
+  // ইউজার যদি লগইন থাকে এবং লগইন পেজে যাওয়ার চেষ্টা করে
+  if (isLoggedIn && nextUrl.pathname.startsWith("/login")) {
+    const role = (req.auth?.user as any)?.role;
+    if (role === "MANUFACTURER") return NextResponse.redirect(new URL("/dashboard/manufacturer", nextUrl));
+    if (role === "DISTRIBUTOR") return NextResponse.redirect(new URL("/dashboard/distributor", nextUrl));
+    if (role === "RETAILER") return NextResponse.redirect(new URL("/dashboard/retailer", nextUrl));
+    return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  // ২. লগইন কুকি চেক করা
-  // (আমরা লগইন করার সময় 'userRole' নামে একটা কুকি সেট করব)
-  const userRole = request.cookies.get('userRole')?.value;
-
-  // ৩. প্রোটেকশন লজিক
-  const isManufacturerPage = path.startsWith('/dashboard/manufacturer');
-  const isDistributorPage = path.startsWith('/dashboard/distributor');
-  const isRetailerPage = path.startsWith('/dashboard/retailer');
-
-  // যদি কেউ ড্যাশবোর্ডে ঢুকতে চায় কিন্তু লগইন করা না থাকে
-  if ((isManufacturerPage || isDistributorPage || isRetailerPage) && !userRole) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
-
-  // ৪. সঠিক রোল চেক করা (Role Based Access)
-  if (isManufacturerPage && userRole !== 'MANUFACTURER') {
-    return NextResponse.rewrite(new URL('/unauthorized', request.url));
-  }
-
-  if (isDistributorPage && userRole !== 'DISTRIBUTOR') {
-    return NextResponse.rewrite(new URL('/unauthorized', request.url));
-  }
-
-  if (isRetailerPage && userRole !== 'RETAILER') {
-    return NextResponse.rewrite(new URL('/unauthorized', request.url));
+  // ইউজার যদি লগইন না থাকে এবং ড্যাশবোর্ডে যাওয়ার চেষ্টা করে
+  if (!isLoggedIn && nextUrl.pathname.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
   return NextResponse.next();
-}
+});
 
-// কোন কোন পাথে এই গার্ড কাজ করবে
+// এই রাউটগুলোর জন্য মিডলওয়্যার কাজ করবে
 export const config = {
-  matcher: [
-    '/dashboard/:path*', 
-    '/verify/:path*'
-  ],
-}
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+};
