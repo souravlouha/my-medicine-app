@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { loginAction } from "@/lib/actions/auth-actions";
+import { loginAction } from "@/lib/actions/auth-actions"; // আপনার ফোল্ডার নাম অনুযায়ী ঠিক রাখুন
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Printer } from "lucide-react"; // ✅ আইকন ইম্পোর্ট করা হলো
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -70,6 +71,20 @@ export default function LoginPage() {
                  Create Account
               </Link>
            </div>
+
+           {/* 👇 ✅ OPERATOR BUTTON ADDED HERE 👇 */}
+           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+              <p className="text-gray-400 text-xs mb-3 uppercase tracking-wider font-bold">Factory Operations</p>
+              
+              <Link href="/operator">
+                <button className="w-full py-3 px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold rounded-xl border border-gray-200 flex items-center justify-center gap-2 transition-all hover:shadow-md">
+                  <Printer size={18} className="text-gray-500" />
+                  Enter Operator Mode
+                </button>
+              </Link>
+           </div>
+           {/* 👆 End of Operator Section 👆 */}
+
         </div>
 
       </div>

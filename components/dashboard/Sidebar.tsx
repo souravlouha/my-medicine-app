@@ -15,8 +15,9 @@ import {
   ShoppingCart,
   ShoppingBag,
   Boxes,
-  ScanBarcode, // 👇 নতুন: POS এর জন্য
-  Store        // 👇 নতুন: Retailer Dashboard এর জন্য
+  ScanBarcode, 
+  Store,
+  Printer // ✅ ১. নতুন আইকন ইম্পোর্ট
 } from "lucide-react";
 
 export default function Sidebar({ userRole }: { userRole: string }) {
@@ -28,18 +29,32 @@ export default function Sidebar({ userRole }: { userRole: string }) {
   else if (userRole === "DISTRIBUTOR") dashboardLink = "/dashboard/distributor";
   else if (userRole === "RETAILER") dashboardLink = "/dashboard/retailer";
 
+  // ✅ ২. ডায়নামিক রোল লেবেল লজিক
+  const getRoleLabel = () => {
+    if (userRole === "MANUFACTURER") return "Trusted Manufacturer";
+    if (userRole === "DISTRIBUTOR") return "Authorized Distributor";
+    if (userRole === "RETAILER") return "Registered Retailer";
+    return "Guest User";
+  };
+
   // একটিভ লিংক চেক করার ফাংশন
-  const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col fixed left-0 top-0 z-50 shadow-sm">
       
-      {/* 1. Logo Section */}
-      <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-        <div className="h-9 w-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-blue-200 shadow-lg">
-          M
+      {/* 1. Logo Section (Updated) */}
+      <div className="p-6 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+            <div className="h-9 w-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-blue-200 shadow-lg">
+            M
+            </div>
+            <span className="text-xl font-bold text-gray-800 tracking-tight">MedTrace</span>
         </div>
-        <span className="text-xl font-bold text-gray-800 tracking-tight">MedTrace</span>
+        {/* ✅ এখানে ডায়নামিক রোল দেখাবে */}
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 ml-12">
+            {getRoleLabel()}
+        </p>
       </div>
 
       {/* 2. Navigation Links */}
@@ -49,7 +64,7 @@ export default function Sidebar({ userRole }: { userRole: string }) {
         <Link 
           href={dashboardLink} 
           className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
-            isActive(dashboardLink)
+            pathname === dashboardLink // Dashboard link should perform exact match
               ? "bg-blue-50 text-blue-700 shadow-sm" 
               : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
           }`}
@@ -83,6 +98,25 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                <Package size={20} /> Product Catalog
              </Link>
 
+             {/* ✅ ৩. নতুন Production & Print লিংক যোগ করা হয়েছে */}
+             <Link 
+               href="/dashboard/manufacturer/production"
+               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
+                 isActive("/dashboard/manufacturer/production") ? "bg-blue-50 text-blue-700 shadow-sm" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+               }`}
+             >
+               <Printer size={20} /> Production & Print
+             </Link>
+
+             <Link 
+               href="/dashboard/manufacturer/create-batch"
+               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
+                 isActive("/dashboard/manufacturer/create-batch") ? "bg-blue-50 text-blue-700 shadow-sm" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+               }`}
+             >
+               <ClipboardList size={20} /> Create Batch
+             </Link>
+
              <Link 
                href="/dashboard/manufacturer/inventory"
                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
@@ -92,15 +126,6 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                }`}
              >
                <Boxes size={20} /> My Inventory
-             </Link>
-
-             <Link 
-               href="/dashboard/manufacturer/create-batch"
-               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
-                 isActive("/dashboard/manufacturer/create-batch") ? "bg-blue-50 text-blue-700 shadow-sm" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-               }`}
-             >
-               <ClipboardList size={20} /> Production Line
              </Link>
 
              <Link 
@@ -184,7 +209,7 @@ export default function Sidebar({ userRole }: { userRole: string }) {
            </>
         )}
 
-        {/* 🏪 RETAILER LINKS (New Added) */}
+        {/* 🏪 RETAILER LINKS */}
         {userRole === "RETAILER" && (
            <>
              <div className="px-4 mt-6 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Store Management</div>
