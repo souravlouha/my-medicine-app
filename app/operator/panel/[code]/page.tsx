@@ -29,10 +29,12 @@ export default function OperatorPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ১. ডাটা লোড করা
+  // ১. ডাটা লোড করা (FIXED: Added res.job check for TypeScript)
   const loadJobData = async () => {
     const res = await getJobDetails(code);
-    if (res.success) {
+    
+    // ✅ এখানে res.job চেকটি যোগ করা হয়েছে যাতে undefined এরর না আসে
+    if (res.success && res.job) { 
       setJob(res.job);
       setPrintedCount(res.job.printedQuantity);
       
@@ -55,31 +57,26 @@ export default function OperatorPanel() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [logs]);
 
-  // ✅ প্রোগ্রেস ইনক্রিমেন্ট এবং ডাটাবেস আপডেট হ্যান্ডলার (Fix: Side-effect error)
   const incrementProgress = async (nextCount: number) => {
     setPrintedCount(nextCount);
-    // প্রতি ৫টি প্রিন্ট পর পর অথবা টার্গেট পূর্ণ হলে ডাটাবেস আপডেট হবে
-    if (nextCount % 5 === 0 || nextCount === job.targetQuantity) {
+    if (job && (nextCount % 5 === 0 || nextCount === job.targetQuantity)) {
         await updatePrintProgress(job.id, nextCount); 
     }
   };
 
-  // ২. প্রিন্টিং লজিক (Remote Pause Check সহ)
   const handleStart = () => {
-    if (status === "COMPLETED") return;
+    if (status === "COMPLETED" || !job) return;
     setStatus("PRINTING");
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ▶️ STARTING SEQUENCE...`]);
 
     intervalRef.current = setInterval(async () => {
-        // ১. রিমোট পজ চেক
         const check = await getJobDetails(code);
-        if (check.job.status === "PAUSED") {
+        if (check.success && check.job && check.job.status === "PAUSED") {
             handlePause();
             setLogs(l => [...l, `[${new Date().toLocaleTimeString()}] ⚠️ REMOTE PAUSE DETECTED`]);
             return;
         }
 
-        // ২. লোকাল কাউন্ট আপডেট
         setPrintedCount((prev) => {
             const nextCount = prev + 1;
             const target = job.targetQuantity;
@@ -89,12 +86,10 @@ export default function OperatorPanel() {
                 return prev;
             }
 
-            // ৩. কিউআর ডাটা এবং লগ আপডেট
             const unitUid = job.batch.units[nextCount - 1]?.uid || `STRIP-${job.batch.batchNumber}-${nextCount}`;
             setCurrentQRData({ uid: unitUid, batch: job.batch.batchNumber });
             setLogs(l => [...l.slice(-10), `[${new Date().toLocaleTimeString()}] PRINTED: ${unitUid}`]);
 
-            // ৪. প্রগ্রেস ডাটাবেসে সেভ করা (আপনার দেওয়া লজিক অনুযায়ী)
             incrementProgress(nextCount);
 
             return nextCount;
@@ -108,6 +103,7 @@ export default function OperatorPanel() {
   };
 
   const handleSubmitBatch = async () => {
+    if (!job) return;
     setIsSubmitting(true);
     const res = await completePrintJob(job.id);
     if (res.success) {
@@ -122,7 +118,6 @@ export default function OperatorPanel() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans">
-      {/* HEADER SECTION */}
       <header className="bg-white border-b border-slate-200 p-4 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-6">
@@ -149,7 +144,6 @@ export default function OperatorPanel() {
       </header>
 
       <main className="p-4 md:p-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* LEFT COLUMN */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
              <h2 className="text-blue-600 text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2"><FlaskConical size={14}/> Current Job</h2>
@@ -188,7 +182,6 @@ export default function OperatorPanel() {
           </div>
         </div>
 
-        {/* CENTER COLUMN: MAIN MONITOR */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white border border-slate-200 rounded-[3rem] p-8 relative overflow-hidden h-[380px] flex flex-col items-center justify-center shadow-sm">
             <div className="absolute inset-0 bg-grid-slate-100/[0.5] bg-[length:25px_25px]"></div>
@@ -210,7 +203,7 @@ export default function OperatorPanel() {
             )}
 
             <div className="absolute bottom-0 left-0 w-full bg-slate-50 h-3">
-              <div className="bg-blue-600 h-full transition-all duration-500" style={{ width: `${(printedCount / job?.targetQuantity) * 100}%` }}></div>
+              <div className="bg-blue-600 h-full transition-all duration-500" style={{ width: `${(printedCount / (job?.targetQuantity || 1)) * 100}%` }}></div>
             </div>
           </div>
 
@@ -221,7 +214,7 @@ export default function OperatorPanel() {
                   <div className="text-5xl font-black text-slate-900">{printedCount}<span className="text-lg text-slate-300 ml-1">/{job?.targetQuantity}</span></div>
                 </div>
                 <div className="bg-blue-600 text-white w-14 h-14 rounded-2xl flex items-center justify-center font-black text-lg">
-                  {Math.round((printedCount / job?.targetQuantity) * 100)}%
+                  {Math.round((printedCount / (job?.targetQuantity || 1)) * 100)}%
                 </div>
              </div>
 
@@ -256,7 +249,6 @@ export default function OperatorPanel() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: LIVE PREVIEW */}
         <div className="lg:col-span-1">
           <div className="bg-white border-2 border-blue-100 rounded-[3rem] overflow-hidden shadow-xl h-full flex flex-col">
             <div className="bg-slate-900 p-5 flex items-center justify-between">
@@ -270,12 +262,12 @@ export default function OperatorPanel() {
             <div className="flex-1 p-6 flex flex-col items-center bg-slate-50 relative">
               {currentQRData ? (
                 <div className="animate-in fade-in zoom-in duration-300 flex flex-col items-center w-full">
-                  <div className="w-full aspect-square bg-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-100 mb-8 flex items-center justify-center">
+                  <div className="w-full aspect-square bg-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-100 mb-8 flex items-center justify-center relative">
                     <QRCodeSVG value={currentQRData.uid} size={150} level="H" />
                   </div>
                   
                   <div className="w-full bg-white rounded-3xl p-5 border border-blue-50 shadow-inner space-y-3 font-mono text-[10px]">
-                      <p className="text-blue-500 font-black uppercase flex items-center gap-2 tracking-tighter"><Database size={12}/> Live Data Feed</p>
+                      <p className="text-blue-500 font-black uppercase flex items-center gap-2 tracking-tighter"><Database size={12}/> Encoded Data</p>
                       <div className="flex justify-between border-b border-slate-50 pb-1">
                           <span className="text-slate-400">UID:</span>
                           <span className="text-slate-800 font-bold break-all ml-4 text-right">{currentQRData.uid}</span>
@@ -290,7 +282,7 @@ export default function OperatorPanel() {
               ) : (
                 <div className="text-center opacity-20 flex flex-col items-center justify-center h-full">
                   <QrCode size={100} className="text-slate-300 mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest leading-tight text-center">Scanner Standby<br/>Waiting for sequence</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-center">Scanner Standby<br/>Waiting for sequence</p>
                 </div>
               )}
             </div>
@@ -298,7 +290,6 @@ export default function OperatorPanel() {
         </div>
       </main>
 
-      {/* ✅ CSS অ্যানিমেশন (সবশেষে মেইন ডিভ-এর ভেতরে) */}
       <style jsx global>{`
         @keyframes scan { 0% { top: 0%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
         .animate-scan { animation: scan 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
