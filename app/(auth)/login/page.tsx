@@ -3,31 +3,24 @@
 import { useState } from "react";
 import { loginAction } from "@/lib/actions/auth-actions"; 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+// useRouter দরকার নেই কারণ সার্ভার রিডাইরেক্ট করবে
 import { Printer } from "lucide-react"; 
-
-// ফিক্স করার জন্য টাইপ ইন্টারফেস
-interface LoginResponse {
-  success: boolean;
-  error?: string;
-  redirectUrl?: string;
-}
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     
     const formData = new FormData(event.currentTarget);
-    const result = await loginAction(formData) as LoginResponse; // ✅ টাইপ কাস্টিং করা হলো
+    
+    // সার্ভার অ্যাকশন কল
+    const result = await loginAction(formData);
 
-    if (result.success) {
-      // ✅ সফল লগইন - বিল্ড এরর এখন আর আসবে না
-      router.push(result.redirectUrl || "/dashboard");
-    } else {
+    // ⚠️ যদি কোড এই লাইনে আসে, তার মানে কোনো এরর হয়েছে।
+    // কারণ সফল হলে সার্ভার অটোমেটিক পেজ চেঞ্জ করে ফেলত।
+    if (result?.error) {
       alert("❌ " + result.error);
       setLoading(false);
     }
