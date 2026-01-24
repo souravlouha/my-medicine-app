@@ -36,7 +36,6 @@ export default function OperatorPanel() {
       setJob(res.job);
       setPrintedCount(res.job.printedQuantity);
       
-      // ম্যানুফ্যাকচারার যদি পজ করে থাকে তবে ইন্টারফেস আপডেট করা
       if (res.job.status === "PAUSED") setStatus("PAUSED");
       else if (res.job.status === "COMPLETED") setStatus("COMPLETED");
 
@@ -56,6 +55,15 @@ export default function OperatorPanel() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [logs]);
 
+  // ✅ প্রোগ্রেস ইনক্রিমেন্ট এবং ডাটাবেস আপডেট হ্যান্ডলার (Fix: Side-effect error)
+  const incrementProgress = async (nextCount: number) => {
+    setPrintedCount(nextCount);
+    // প্রতি ৫টি প্রিন্ট পর পর অথবা টার্গেট পূর্ণ হলে ডাটাবেস আপডেট হবে
+    if (nextCount % 5 === 0 || nextCount === job.targetQuantity) {
+        await updatePrintProgress(job.id, nextCount); 
+    }
+  };
+
   // ২. প্রিন্টিং লজিক (Remote Pause Check সহ)
   const handleStart = () => {
     if (status === "COMPLETED") return;
@@ -63,7 +71,7 @@ export default function OperatorPanel() {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ▶️ STARTING SEQUENCE...`]);
 
     intervalRef.current = setInterval(async () => {
-        // প্রতিবার প্রিন্ট করার আগে ডাটাবেস থেকে লেটেস্ট স্ট্যাটাস চেক করা
+        // ১. রিমোট পজ চেক
         const check = await getJobDetails(code);
         if (check.job.status === "PAUSED") {
             handlePause();
@@ -71,6 +79,7 @@ export default function OperatorPanel() {
             return;
         }
 
+        // ২. লোকাল কাউন্ট আপডেট
         setPrintedCount((prev) => {
             const nextCount = prev + 1;
             const target = job.targetQuantity;
@@ -80,14 +89,14 @@ export default function OperatorPanel() {
                 return prev;
             }
 
+            // ৩. কিউআর ডাটা এবং লগ আপডেট
             const unitUid = job.batch.units[nextCount - 1]?.uid || `STRIP-${job.batch.batchNumber}-${nextCount}`;
             setCurrentQRData({ uid: unitUid, batch: job.batch.batchNumber });
             setLogs(l => [...l.slice(-10), `[${new Date().toLocaleTimeString()}] PRINTED: ${unitUid}`]);
 
-            // প্রগ্রেস আপডেট
-            if (nextCount % 5 === 0 || nextCount === target) {
-                updatePrintProgress(job.id, nextCount);
-            }
+            // ৪. প্রগ্রেস ডাটাবেসে সেভ করা (আপনার দেওয়া লজিক অনুযায়ী)
+            incrementProgress(nextCount);
+
             return nextCount;
         });
     }, 1200);
@@ -98,7 +107,6 @@ export default function OperatorPanel() {
     setStatus("PAUSED");
   };
 
-  // ৩. ফাইনাল সাবমিশন (ম্যানুফ্যাকচারারকে জানানো)
   const handleSubmitBatch = async () => {
     setIsSubmitting(true);
     const res = await completePrintJob(job.id);
@@ -146,7 +154,7 @@ export default function OperatorPanel() {
           <div className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
              <h2 className="text-blue-600 text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2"><FlaskConical size={14}/> Current Job</h2>
              <div className="space-y-4">
-               <div className="text-xl font-black text-slate-900">{job?.batch?.product?.name}</div>
+               <div className="text-xl font-black text-slate-900 leading-tight">{job?.batch?.product?.name}</div>
                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex justify-between text-[10px] font-bold">
                  <span className="text-slate-400 uppercase">Target Qty</span>
                  <span className="text-blue-600 uppercase">{job?.targetQuantity} Units</span>
@@ -167,6 +175,16 @@ export default function OperatorPanel() {
                  </div>
                ))}
              </div>
+          </div>
+          
+          <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-5 h-40 flex flex-col font-mono text-[10px] shadow-xl">
+            <div className="text-slate-500 border-b border-slate-800 pb-2 mb-2 flex justify-between uppercase">
+              <span>System Logs</span>
+              <div className={`w-2 h-2 rounded-full ${status === "PRINTING" ? 'bg-blue-500 animate-pulse' : 'bg-slate-700'}`}></div>
+            </div>
+            <div ref={scrollRef} className="overflow-y-auto space-y-1 flex-1 text-blue-200/60 scrollbar-hide">
+              {logs.map((log, i) => <div key={i} className="border-l border-blue-500/20 pl-2">{log}</div>)}
+            </div>
           </div>
         </div>
 
@@ -208,7 +226,6 @@ export default function OperatorPanel() {
              </div>
 
              <div className="flex items-center">
-                {/* যদি সব প্রিন্ট হয়ে যায়, তবে কনফার্ম বাটন আসবে */}
                 {printedCount >= job?.targetQuantity && status !== "COMPLETED" ? (
                   <button 
                     onClick={handleSubmitBatch}
@@ -239,7 +256,7 @@ export default function OperatorPanel() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: LIVE PREVIEW (Real QR) */}
+        {/* RIGHT COLUMN: LIVE PREVIEW */}
         <div className="lg:col-span-1">
           <div className="bg-white border-2 border-blue-100 rounded-[3rem] overflow-hidden shadow-xl h-full flex flex-col">
             <div className="bg-slate-900 p-5 flex items-center justify-between">
@@ -253,13 +270,12 @@ export default function OperatorPanel() {
             <div className="flex-1 p-6 flex flex-col items-center bg-slate-50 relative">
               {currentQRData ? (
                 <div className="animate-in fade-in zoom-in duration-300 flex flex-col items-center w-full">
-                  <div className="w-full aspect-square bg-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-100 mb-8 flex items-center justify-center relative">
-                    {/* আসল QR জেনারেশন */}
+                  <div className="w-full aspect-square bg-white p-6 rounded-[2.5rem] shadow-2xl border border-slate-100 mb-8 flex items-center justify-center">
                     <QRCodeSVG value={currentQRData.uid} size={150} level="H" />
                   </div>
                   
                   <div className="w-full bg-white rounded-3xl p-5 border border-blue-50 shadow-inner space-y-3 font-mono text-[10px]">
-                      <p className="text-blue-500 font-black uppercase flex items-center gap-2"><Database size={12}/> Encoded Data</p>
+                      <p className="text-blue-500 font-black uppercase flex items-center gap-2 tracking-tighter"><Database size={12}/> Live Data Feed</p>
                       <div className="flex justify-between border-b border-slate-50 pb-1">
                           <span className="text-slate-400">UID:</span>
                           <span className="text-slate-800 font-bold break-all ml-4 text-right">{currentQRData.uid}</span>
@@ -274,7 +290,7 @@ export default function OperatorPanel() {
               ) : (
                 <div className="text-center opacity-20 flex flex-col items-center justify-center h-full">
                   <QrCode size={100} className="text-slate-300 mb-4" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-center">Scanner Standby<br/>Waiting for sequence</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest leading-tight text-center">Scanner Standby<br/>Waiting for sequence</p>
                 </div>
               )}
             </div>
@@ -282,6 +298,7 @@ export default function OperatorPanel() {
         </div>
       </main>
 
+      {/* ✅ CSS অ্যানিমেশন (সবশেষে মেইন ডিভ-এর ভেতরে) */}
       <style jsx global>{`
         @keyframes scan { 0% { top: 0%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
         .animate-scan { animation: scan 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite; }

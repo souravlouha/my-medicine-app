@@ -41,23 +41,20 @@ export async function getAvailableBatches() {
 // ✅ ২. নতুন জব তৈরি (UPDATED: Time Limit & Operator)
 export async function createPrintJob(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+  if (!session?.user?.id) return { success: false as const, error: "Unauthorized" };
 
   const batchId = formData.get("batchId") as string;
   const targetQty = parseInt(formData.get("targetQty") as string);
   const machineName = formData.get("machineName") as string;
   const operatorId = formData.get("operatorId") as string;
-  
-  // 👇 নতুন: কত ঘণ্টার জন্য ভ্যালিড হবে সেটা ফর্ম থেকে নিচ্ছি (Default 8)
   const validityHours = parseInt(formData.get("validity") as string) || 8; 
 
-  if (!batchId || !targetQty) return { success: false, error: "Invalid Data" };
+  if (!batchId || !targetQty) return { success: false as const, error: "Invalid Data" };
 
   try {
     const accessCode = Math.floor(100000 + Math.random() * 900000).toString();
     const jobId = `JOB-${Date.now().toString().slice(-6)}`;
 
-    // 👇 মেয়াদ শেষ হওয়ার সময় ক্যালকুলেট করা হচ্ছে
     const expiryDate = new Date();
     expiryDate.setHours(expiryDate.getHours() + validityHours);
 
@@ -69,42 +66,34 @@ export async function createPrintJob(formData: FormData) {
         targetQuantity: targetQty,
         accessCode,
         operatorId: operatorId || null, 
-        accessExpiresAt: expiryDate, // ✅ ডাইনামিক এক্সপায়ারি ডেট
+        accessExpiresAt: expiryDate,
         status: "PENDING"
       }
     });
 
     revalidatePath("/dashboard/manufacturer/production/assign");
-    return { success: true, code: accessCode };
+    return { success: true as const, code: accessCode };
   } catch (error) {
     console.error(error);
-    return { success: false, error: "Failed to create job" };
+    return { success: false as const, error: "Failed to create job" };
   }
 }
 
 // ✅ ৩. Get All Print Jobs
 export async function getPrintJobs() {
   const session = await auth();
-  
-  if (!session?.user?.id) {
-    return { success: false, data: [] };
-  }
+  if (!session?.user?.id) return { success: false, data: [] };
 
   try {
     const jobs = await prisma.printJob.findMany({
       where: {
-        batch: {
-          manufacturerId: session.user.id
-        }
+        batch: { manufacturerId: session.user.id }
       },
       include: {
-        batch: {
-          include: { product: true }
-        }
+        batch: { include: { product: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
-
     return { success: true, data: jobs };
   } catch (error) {
     console.error("Fetch Jobs Error:", error);
@@ -118,22 +107,14 @@ export async function verifyOperatorCode(code: string) {
     const job = await prisma.printJob.findUnique({
       where: { accessCode: code },
       include: {
-        batch: {
-          include: { product: true }
-        }
+        batch: { include: { product: true } }
       }
     });
 
-    if (!job) {
-      return { success: false, error: "Invalid Access Code" };
-    }
-
-    if (job.status === "COMPLETED") {
-      return { success: false, error: "This job is already completed." };
-    }
-
+    if (!job) return { success: false, error: "Invalid Access Code" };
+    if (job.status === "COMPLETED") return { success: false, error: "This job is already completed." };
     if (job.accessExpiresAt && new Date() > new Date(job.accessExpiresAt)) {
-      return { success: false, error: "Access Code Expired! Ask Manager for new code." };
+      return { success: false, error: "Access Code Expired!" };
     }
 
     return { success: true, job };
@@ -159,9 +140,7 @@ export async function getJobDetails(code: string) {
         }
       }
     });
-
     if (!job) return { success: false, error: "Job not found" };
-
     return { success: true, job };
   } catch (error) {
     return { success: false, error: "Database Error" };
@@ -235,14 +214,11 @@ export async function getOperatorHistory(operatorId: string) {
         status: "COMPLETED"
       },
       include: {
-        batch: {
-          include: { product: true }
-        }
+        batch: { include: { product: true } }
       },
       orderBy: { updatedAt: 'desc' },
-      take: 5 // শেষ ৫টি রেকর্ড নিয়ে আসবে
+      take: 5 
     });
-
     return { success: true, data: history };
   } catch (error) {
     console.error("Fetch Operator History Error:", error);

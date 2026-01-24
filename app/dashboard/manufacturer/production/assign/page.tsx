@@ -49,7 +49,8 @@ export default function AssignJobPage() {
     const res = await createPrintJob(formData);
     
     if (res.success) {
-      setGeneratedCode(res.code);
+      // ✅ FIX: TypeScript এরর দূর করার জন্য nullish coalescing ব্যবহার করা হলো
+      setGeneratedCode(res.code ?? null); 
       await loadData(); // লিস্ট আপডেট হবে
     } else {
       alert("Failed: " + res.error);
@@ -64,17 +65,17 @@ export default function AssignJobPage() {
     handleRefresh();
   }
 
-  // 🕒 সময় বাড়ানোর ফাংশন
+  // 🕒 সময় বাড়ানোর ফাংশন
   const increaseTime = () => {
     if (validity < 24) setValidity(validity + 1);
   };
 
-  // 🕒 সময় কমানোর ফাংশন
+  // 🕒 সময় কমানোর ফাংশন
   const decreaseTime = () => {
     if (validity > 1) setValidity(validity - 1);
   };
 
-  // ✅ সফল হলে পপআপ দেখাবে (Updated with Time Info)
+  // ✅ সফল হলে পপআপ দেখাবে
   if (generatedCode) {
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm p-4">
@@ -129,7 +130,6 @@ export default function AssignJobPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               
-              {/* ১. অপারেটর সিলেক্ট */}
               <div>
                 <label className="font-bold block mb-2 text-xs text-slate-500 uppercase">Assign To (Operator)</label>
                 <div className="relative">
@@ -145,7 +145,6 @@ export default function AssignJobPage() {
                 </div>
               </div>
 
-              {/* ২. ব্যাচ সিলেকশন */}
               <div>
                 <label className="font-bold block mb-2 text-xs text-slate-500 uppercase">Select Batch</label>
                 <div className="relative">
@@ -161,13 +160,11 @@ export default function AssignJobPage() {
                 </div>
               </div>
 
-              {/* ৩. Quantity */}
               <div>
                 <label className="font-bold block mb-2 text-xs text-slate-500 uppercase">Target Qty</label>
                 <input name="targetQty" type="number" className="w-full p-3 border rounded-xl bg-slate-50 text-sm font-medium outline-none" required placeholder="e.g. 5000" />
               </div>
 
-              {/* ৪. Machine */}
               <div>
                 <label className="font-bold block mb-2 text-xs text-slate-500 uppercase">Machine / Line</label>
                 <select name="machineName" className="w-full p-3 border rounded-xl bg-slate-50 text-sm font-medium outline-none">
@@ -177,7 +174,6 @@ export default function AssignJobPage() {
                 </select>
               </div>
 
-              {/* ✅ ৫. টাইম কন্ট্রোল (NEW FEATURE) */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                  <div className="flex justify-between items-center mb-3">
                     <label className="font-bold text-xs text-slate-500 uppercase flex items-center gap-1">
@@ -202,8 +198,6 @@ export default function AssignJobPage() {
                         <Plus size={18} className="text-slate-600"/>
                     </button>
                  </div>
-                 
-                 {/* Hidden input to send value to server */}
                  <input type="hidden" name="validity" value={validity} />
               </div>
 
@@ -240,7 +234,6 @@ export default function AssignJobPage() {
               {activeJobs.map((job) => (
                 <div key={job.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition flex flex-col md:flex-row justify-between items-center gap-4">
                   
-                  {/* Job Info */}
                   <div className="flex-1 w-full">
                     <div className="flex items-center gap-3 mb-1">
                       <span className="font-mono text-xs font-bold bg-slate-100 text-slate-600 px-2 py-1 rounded">
@@ -257,11 +250,10 @@ export default function AssignJobPage() {
                     <h3 className="font-bold text-slate-800">{job.batch.product.name}</h3>
                     <p className="text-sm text-slate-500">Batch: {job.batch.batchNumber} • Machine: {job.machineName}</p>
                     
-                    {/* Progress Bar */}
                     <div className="mt-3 w-full max-w-xs">
                        <div className="flex justify-between text-xs font-bold text-slate-400 mb-1">
-                          <span>{job.printedQuantity} Printed</span>
-                          <span>Target: {job.targetQuantity}</span>
+                         <span>{job.printedQuantity} Printed</span>
+                         <span>Target: {job.targetQuantity}</span>
                        </div>
                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div 
@@ -272,7 +264,6 @@ export default function AssignJobPage() {
                     </div>
                   </div>
 
-                  {/* 🎮 Controls */}
                   <div className="flex gap-2">
                     {job.status === 'PAUSED' ? (
                       <button 
@@ -306,7 +297,6 @@ export default function AssignJobPage() {
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
