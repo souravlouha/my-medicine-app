@@ -1,14 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth"; // ✅ কুকির বদলে auth ইম্পোর্ট
+import { auth } from "@/lib/auth"; // ✅ ফিক্স ১: কুকির বদলে auth ইম্পোর্ট
 import { redirect } from "next/navigation";
-import ManufacturerHeader from "@/components/dashboard/ManufacturerHeader"; 
+// ❌ ManufacturerHeader এখান থেকে সরিয়ে দেওয়া হয়েছে (Layout-এ আছে তাই)
 import { Package, Truck, ShoppingCart, DollarSign, ArrowDownLeft, TrendingUp } from "lucide-react";
 import Link from "next/link";
-// 👇 নতুন চার্ট ইম্পোর্ট
 import { InventoryValueChart, OrderStatusChart } from "./components/DistributorCharts";
 
 export default async function DistributorDashboard() {
-  // ✅ ফিক্স: কুকির বদলে সেশন ব্যবহার করা হলো (লগইন সমস্যা সমাধান)
+  // ✅ ফিক্স ২: কুকির বদলে সেশন ব্যবহার (লগইন স্ট্যাবল করার জন্য)
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -23,27 +22,27 @@ export default async function DistributorDashboard() {
     // A. User Details
     prisma.user.findUnique({ where: { id: userId } }),
     
-    // B. Inventory (Stock & Value calculation)
+    // B. Inventory
     prisma.inventory.findMany({ 
       where: { userId },
       include: { batch: { include: { product: true } } }
     }),
 
-    // C. Incoming from Manufacturer (Status: IN_TRANSIT)
+    // C. Incoming Shipments
     prisma.shipment.findMany({
       where: { distributorId: userId, status: "IN_TRANSIT" },
       orderBy: { createdAt: 'desc' },
       include: { sender: true }
     }),
 
-    // D. Orders from Retailers (Status: PENDING) - For the list
+    // D. Retailer Orders
     prisma.order.findMany({
       where: { receiverId: userId, status: "PENDING" },
       orderBy: { createdAt: 'desc' },
       include: { sender: true }
     }),
 
-    // E. All Orders (For Charts) - ✅ NEW FETCH
+    // E. All Orders (For Charts)
     prisma.order.findMany({
       where: { 
         OR: [
@@ -62,9 +61,7 @@ export default async function DistributorDashboard() {
   const totalStock = inventory.reduce((acc, item) => acc + item.currentStock, 0);
   const stockValue = inventory.reduce((acc, item) => acc + (item.currentStock * item.batch.mrp), 0);
 
-  // 📊 Chart Data Preparation
-  
-  // A. Inventory Value by Type
+  // 📊 Chart Data
   const valueByType: Record<string, number> = {};
   inventory.forEach(item => {
     const type = item.batch.product.type;
@@ -76,7 +73,6 @@ export default async function DistributorDashboard() {
     value: Math.round(value)
   }));
 
-  // B. Order Status Counts
   const statusCounts: Record<string, number> = { PENDING: 0, APPROVED: 0, SHIPPED: 0, DELIVERED: 0, CANCELLED: 0 };
   allOrders.forEach(order => {
     if (statusCounts[order.status] !== undefined) {
@@ -93,9 +89,7 @@ export default async function DistributorDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-10 p-6">
       
-      {/* Header (Reuse existing header component) */}
-      {/* as any ব্যবহার করা হয়েছে যাতে টাইপ এরর না দেয় */}
-      <ManufacturerHeader user={user as any} />
+      {/* ❌ এখান থেকে <ManufacturerHeader /> সরিয়ে দেওয়া হয়েছে */}
 
       {/* 🟢 1. KPI STATS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -117,7 +111,7 @@ export default async function DistributorDashboard() {
             </div>
          </div>
 
-         {/* Incoming Shipments Alert */}
+         {/* Incoming Alert */}
          <Link href="/dashboard/distributor/incoming" className="bg-orange-50 p-6 rounded-2xl border border-orange-100 shadow-sm flex items-center gap-4 hover:shadow-md transition cursor-pointer group">
             <div className="p-4 bg-white text-orange-600 rounded-xl shadow-sm group-hover:scale-110 transition"><ArrowDownLeft size={24}/></div>
             <div>
@@ -127,7 +121,7 @@ export default async function DistributorDashboard() {
             </div>
          </Link>
 
-         {/* Retailer Orders Alert */}
+         {/* Orders Alert */}
          <Link href="/dashboard/distributor/orders" className="bg-purple-50 p-6 rounded-2xl border border-purple-100 shadow-sm flex items-center gap-4 hover:shadow-md transition cursor-pointer group">
             <div className="p-4 bg-white text-purple-600 rounded-xl shadow-sm group-hover:scale-110 transition"><ShoppingCart size={24}/></div>
             <div>
@@ -138,16 +132,16 @@ export default async function DistributorDashboard() {
          </Link>
       </div>
 
-      {/* 📊 2. ANALYTICS CHARTS SECTION (NEW) */}
+      {/* 📊 2. ANALYTICS CHARTS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
          <InventoryValueChart data={pieData} />
          <OrderStatusChart data={orderBarData} />
       </div>
 
-      {/* 🟠 3. MAIN SECTIONS: INCOMING & ORDERS */}
+      {/* 🟠 3. MAIN SECTIONS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
          
-         {/* A. Incoming Shipments (Manufacturer -> Distributor) */}
+         {/* Incoming Shipments */}
          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -177,7 +171,6 @@ export default async function DistributorDashboard() {
                   </div>
                ))}
             </div>
-            {/* Action Footer */}
             {incomingShipments.length > 0 && (
                <div className="p-4 border-t border-gray-100 bg-orange-50/30">
                   <Link href="/dashboard/distributor/incoming" className="w-full block text-center bg-gray-900 text-white py-2 rounded-lg text-sm font-bold hover:bg-black transition">
@@ -187,7 +180,7 @@ export default async function DistributorDashboard() {
             )}
          </div>
 
-         {/* B. Retailer Orders (Retailer -> Distributor) */}
+         {/* Retailer Orders */}
          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -217,7 +210,6 @@ export default async function DistributorDashboard() {
                   </div>
                ))}
             </div>
-            {/* Action Footer */}
             {receivedOrders.length > 0 && (
                <div className="p-4 border-t border-gray-100 bg-purple-50/30">
                   <Link href="/dashboard/distributor/orders" className="w-full block text-center bg-blue-600 text-white py-2 rounded-lg text-sm font-bold hover:bg-blue-700 transition">
@@ -229,7 +221,7 @@ export default async function DistributorDashboard() {
 
       </div>
 
-      {/* 🚀 4. QUICK ACTION: Order from Manufacturer */}
+      {/* 🚀 4. QUICK ACTION */}
       <div className="bg-[#1E293B] rounded-2xl p-8 text-white flex flex-col md:flex-row justify-between items-center shadow-xl gap-4">
          <div>
             <h3 className="text-xl font-bold flex items-center gap-2">
