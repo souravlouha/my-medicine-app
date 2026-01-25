@@ -1,14 +1,17 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ ফিক্স: কুকির বদলে auth ইম্পোর্ট
 import { redirect } from "next/navigation";
 import { ShoppingCart, ArrowUpRight, ArrowDownLeft, Clock, CheckCircle, Truck, XCircle } from "lucide-react";
-// 👇 অ্যাকশন ইম্পোর্ট করা হয়েছে
 import { updateOrderStatusAction } from "@/lib/actions/distributor-actions"; 
 
 export default async function ManageOrdersPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) redirect("/login");
+  // ✅ ফিক্স: কুকির বদলে সেশন ব্যবহার করা হলো
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    redirect("/login");
+  }
 
   // ১. ডাটা ফেচিং
   const [sentOrders, receivedOrders] = await Promise.all([

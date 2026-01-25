@@ -1,14 +1,17 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ ফিক্স: কুকির বদলে auth ইম্পোর্ট
 import { redirect } from "next/navigation";
 import { Package, AlertTriangle, Search, Filter } from "lucide-react";
-// 👇 নতুন ইম্পোর্ট
 import InventoryAnalytics from "./InventoryAnalytics";
 
 export default async function DistributorInventoryPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) redirect("/login");
+  // ✅ ফিক্স: কুকির বদলে সেশন ব্যবহার করা হলো
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    redirect("/login");
+  }
 
   // ১. ইনভেন্টরি ডাটা ফেচ করা
   const inventoryItems = await prisma.inventory.findMany({
@@ -35,11 +38,9 @@ export default async function DistributorInventoryPage() {
             </h1>
             <p className="text-gray-500 text-sm mt-1">Manage your stock levels and monitor batch expiry.</p>
          </div>
-         
-         {/* Old Stats Removed - Now Handled by Analytics Component */}
       </div>
 
-      {/* 📊 NEW ANALYTICS DASHBOARD (Added Here) */}
+      {/* 📊 NEW ANALYTICS DASHBOARD */}
       {inventoryItems.length > 0 ? (
          <InventoryAnalytics inventory={inventoryItems} />
       ) : (
@@ -128,7 +129,6 @@ export default async function DistributorInventoryPage() {
             </table>
          </div>
       </div>
-
     </div>
   );
 }

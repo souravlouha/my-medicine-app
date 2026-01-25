@@ -1,13 +1,17 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ ফিক্স: কুকির বদলে auth ইম্পোর্ট
 import { redirect } from "next/navigation";
 import { ShoppingCart, Tag, Factory } from "lucide-react";
-import OrderCard from "./OrderCard"; // 👇 নিচের ধাপে বানাচ্ছি
+import OrderCard from "./OrderCard"; 
 
 export default async function PlaceOrderPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) redirect("/login");
+  // ✅ ফিক্স: কুকির বদলে সেশন ব্যবহার করা হলো
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    redirect("/login");
+  }
 
   // ১. সব প্রোডাক্ট ফেচ করা (Catalog)
   const products = await prisma.product.findMany({
