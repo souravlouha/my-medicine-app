@@ -40,7 +40,7 @@ export default function PharmacyLocator() {
         </h1>
         
         <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-           আমরা একটি শক্তিশালী <b>স্মার্ট ম্যাপ</b> তৈরি করছি। খুব শীঘ্রই আপনি জিপিএস-এর মাধ্যমে আপনার কাছের সব ফার্মেসি এবং ওষুধের স্টক দেখতে পাবেন।
+           We are building a powerful <b>Smart Map</b>. Soon you will be able to locate nearby pharmacies and check real-time medicine stock via GPS.
         </p>
 
         {/* --- Upcoming Features List --- */}
@@ -56,7 +56,7 @@ export default function PharmacyLocator() {
           className="flex items-center justify-center gap-2 w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 hover:scale-[1.02] transition-all duration-300 shadow-xl shadow-slate-200"
         >
           <ArrowLeft size={20} />
-          হোম পেজে ফিরে যান
+          Back to Home
         </Link>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image"; // ✅ ইমেজ ইম্পোর্ট
+import Image from "next/image"; 
 import { 
   ShieldCheck, QrCode, Search, Smartphone, Play, 
   MapPin, Bell, AlertTriangle, Mic as MicIcon, Activity, X, User, 
@@ -174,7 +174,7 @@ export default function LandingPage() {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-10px); }
         }
-        /* ✅ Flip Animation for Logo */
+        /* ✅ Flip Animation for Mobile Logo */
         @keyframes flip {
           0%, 80% { transform: rotateY(0); } 
           100% { transform: rotateY(360deg); }
@@ -206,20 +206,28 @@ export default function LandingPage() {
           {/* -- Background Gradient -- */}
           <div className="absolute top-0 left-0 w-full h-[350px] bg-gradient-to-b from-blue-700 via-indigo-600 to-[#F8FAFC] rounded-b-[3rem] z-0 shadow-xl"></div>
           
-          {/* -- Top Floating Header -- */}
-          <div className="fixed top-4 left-0 right-0 z-50 px-4">
-             <div className="bg-white/90 backdrop-blur-md rounded-full shadow-xl border border-white/50 p-2.5 flex justify-between items-center px-5">
+          {/* -- Top Floating Header (✅ Mobile Island Animation Added) -- */}
+          <div className="fixed top-4 left-0 right-0 z-50 flex justify-center">
+             <div className={`transition-all duration-500 ease-in-out flex justify-between items-center px-5 backdrop-blur-md rounded-full border shadow-xl 
+                ${scrolled 
+                  ? 'w-[90%] py-2 bg-white/95 border-slate-200'  // Scrolled state: Smaller, more distinct
+                  : 'w-[95%] py-3 bg-white/90 border-white/50'   // Default state: Wider, lighter
+                }`}>
+                 
                  <div className="flex items-center gap-3">
-                     {/* ✅ লোগো আপডেট: সাইজ বড় (w-10 h-10) এবং ফ্লিপ অ্যানিমেশন যোগ করা হয়েছে */}
-                     <Image 
-                        src="/medtrace-logo.png" 
-                        alt="Logo" 
-                        width={40} 
-                        height={40} 
-                        className="h-10 w-auto animate-flip" 
-                     />
-                     <span className="font-bold text-slate-800 text-lg tracking-tight">MedTrace</span>
+                     {/* ✅ MOBILE LOGO: Bigger, Circular & Animated */}
+                     <div className="bg-white rounded-full p-1 shadow-md animate-flip border-2 border-white">
+                        <Image 
+                           src="/medtrace-logo.png" 
+                           alt="Logo" 
+                           width={56} 
+                           height={56} 
+                           className="h-14 w-14 object-contain rounded-full" 
+                        />
+                     </div>
+                     <span className="font-bold text-slate-800 text-xl tracking-tight">MedTrace</span>
                  </div>
+                 
                  <div className="flex items-center gap-3">
                      <div className="bg-slate-100 p-2 rounded-full text-slate-600 relative cursor-pointer hover:bg-slate-200 transition">
                          <Bell size={18}/>
@@ -234,6 +242,7 @@ export default function LandingPage() {
 
           {/* -- Mobile Hero Content -- */}
           <div className="relative z-10 px-6 pt-28 pb-4 text-white">
+             {/* ... Hero content remains same ... */}
              <div className="flex justify-between items-end mb-6">
                  <div>
                      <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Stay Safe</p>
@@ -268,7 +277,6 @@ export default function LandingPage() {
                  <div className="bg-white p-2.5 rounded-full text-pink-600 shadow-md animate-bounce"><Lightbulb size={24}/></div>
                  <div className="flex-1">
                      <p className="text-[10px] font-black text-white uppercase tracking-wider mb-0.5 opacity-90">Daily Health Tip</p>
-                     {/* Key is used to trigger animation on change */}
                      <p key={currentTip} className="text-sm font-bold text-white leading-snug drop-shadow-sm animate-fade-text">
                          {healthTips[currentTip]}
                      </p>
@@ -310,8 +318,6 @@ export default function LandingPage() {
                 <MoreHorizontal size={20} className="text-slate-400"/>
              </div>
              <div className="grid grid-cols-4 gap-3 mb-8">
-                
-                {/* 📍 PHARMACY LOCATOR CARD */}
                 <Link href="/features/pharmacy-locator" className="col-span-2">
                    <div className="bg-blue-600 text-white p-4 rounded-[1.5rem] shadow-lg shadow-blue-500/20 active:scale-95 transition cursor-pointer flex flex-col justify-between h-36 relative overflow-hidden">
                        <div className="relative z-10">
@@ -330,7 +336,6 @@ export default function LandingPage() {
                        <div className="bg-red-100 text-red-500 p-2 rounded-full"><AlertTriangle size={16}/></div>
                        <span className="text-xs font-bold text-slate-700">Report Fake</span>
                     </div>
-                    {/* ✅ Safety Score */}
                     <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition">
                        <div className="bg-emerald-100 text-emerald-500 p-2 rounded-full"><Award size={16}/></div>
                        <div>
@@ -339,29 +344,6 @@ export default function LandingPage() {
                        </div>
                     </div>
                 </div>
-             </div>
-          </div>
-
-          {/* -- ✅ FIXED: Scrolling Tickers (Partners + Quotes) -- */}
-          <div className="mb-8 space-y-1">
-             <div className="bg-slate-900 py-3 overflow-hidden shadow-inner">
-                 <div className="animate-scroll flex gap-8 items-center px-4">
-                     {[...partners, ...partners].map((p, i) => (
-                         <span key={`p-${i}`} className="text-white/90 font-bold text-xs whitespace-nowrap flex items-center gap-2">
-                             <Building2 size={12} className="text-blue-400"/> {p}
-                         </span>
-                     ))}
-                 </div>
-             </div>
-             {/* ✅ Quotes Section Restored */}
-             <div className="bg-blue-900 py-2 overflow-hidden border-t border-blue-800">
-                 <div className="animate-scroll-reverse flex gap-8 items-center px-4">
-                     {[...quotes, ...quotes].map((q, i) => (
-                         <span key={`q-${i}`} className="text-blue-100 text-[10px] italic whitespace-nowrap flex items-center gap-2">
-                             <Quote size={10} className="fill-current"/> {q}
-                         </span>
-                     ))}
-                 </div>
              </div>
           </div>
 
@@ -378,7 +360,6 @@ export default function LandingPage() {
                 </div>
              </div>
 
-             {/* Live Stats */}
              <div className="grid grid-cols-2 gap-3 mb-4">
                  <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl flex flex-col items-center justify-center text-center">
                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Genuine Scans</p>
@@ -456,16 +437,18 @@ export default function LandingPage() {
           {/* --- Desktop Floating Header --- */}
           <div className="fixed top-6 left-0 right-0 flex justify-center z-50">
              <div className={`transition-all duration-500 ease-in-out ${scrolled ? 'w-[60%] py-3 shadow-2xl bg-white/80 border-white/40' : 'w-[80%] py-4 bg-white/60 border-transparent'} backdrop-blur-xl border rounded-full px-8 flex justify-between items-center shadow-lg ring-1 ring-slate-900/5`}>
-                <div className="flex items-center gap-3 cursor-pointer">
-                   {/* ✅ ডেস্কটপ হেডার লোগো - সাইজ বড় করা হয়েছে */}
-                   <Image 
-                      src="/medtrace-logo.png" 
-                      alt="Logo" 
-                      width={40} 
-                      height={40} 
-                      className="h-10 w-auto" 
-                   />
-                   <span className="text-lg font-black tracking-tight text-slate-900">MedTrace</span>
+                <div className="flex items-center gap-4 cursor-pointer group">
+                   {/* ✅ DESKTOP LOGO: Bigger & Circular */}
+                   <div className="bg-white p-1 rounded-full shadow-lg border-2 border-white/50 group-hover:scale-105 transition-transform duration-300">
+                      <Image 
+                         src="/medtrace-logo.png" 
+                         alt="Logo" 
+                         width={56} 
+                         height={56} 
+                         className="h-14 w-14 object-contain rounded-full" 
+                      />
+                   </div>
+                   <span className="text-xl font-black tracking-tight text-slate-900">MedTrace</span>
                 </div>
                 <div className="flex gap-8 text-sm font-bold text-slate-500">
                    <a href="#" className="hover:text-blue-700 transition">Solutions</a>
@@ -482,10 +465,11 @@ export default function LandingPage() {
              </div>
           </div>
 
-          {/* --- B2B Hero Section with HERO IMAGE --- */}
+          {/* --- B2B Hero Section --- */}
           <div className="relative pt-48 pb-24 bg-slate-50 overflow-hidden">
              <div className="absolute inset-0 z-0 opacity-[0.03]" style={{backgroundImage: 'radial-gradient(#475569 1px, transparent 1px)', backgroundSize: '30px 30px'}}></div>
              <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 gap-20 items-center relative z-10">
+                {/* Hero Text */}
                 <div>
                    <div className="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-1.5 mb-8 shadow-sm animate-fade-in-up">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -510,8 +494,7 @@ export default function LandingPage() {
                          </button>
                       </Link>
                    </div>
-                   
-                   {/* Trust Indicators */}
+                   {/* Partners */}
                    <div className="mt-16 border-t border-slate-200 pt-8">
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5">Trusted by Industry Leaders</p>
                       <div className="flex gap-10 opacity-50 grayscale hover:grayscale-0 transition-all duration-500 cursor-default">
@@ -521,13 +504,12 @@ export default function LandingPage() {
                       </div>
                    </div>
                 </div>
-                
-                {/* ✅ Hero Image Preserved */}
+                {/* Hero Image */}
                 <div className="relative group perspective-1000 animate-float">
                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-[2.5rem] blur-2xl opacity-20 group-hover:opacity-30 transition duration-1000"></div>
                    <div className="relative bg-white rounded-[2.5rem] shadow-2xl border-[8px] border-white p-1 transform transition hover:rotate-1 duration-700 overflow-hidden">
                       <img 
-                         src="/hero.png" // User requested to keep this
+                         src="/hero.png" 
                          className="rounded-[2rem] w-full h-auto object-cover scale-105" 
                          alt="MedTrace Hero"
                       />
@@ -543,7 +525,7 @@ export default function LandingPage() {
              </div>
           </div>
 
-          {/* --- ✅ NEW: Process Flow (How it works) --- */}
+          {/* --- Process Flow --- */}
           <div className="py-24 bg-white relative">
              <div className="max-w-7xl mx-auto px-6">
                  <div className="text-center mb-20">
@@ -551,9 +533,7 @@ export default function LandingPage() {
                      <h2 className="text-4xl font-black text-slate-900 mt-2">End-to-End Traceability</h2>
                  </div>
                  <div className="grid grid-cols-4 gap-8 relative">
-                     {/* Connecting Line */}
                      <div className="absolute top-12 left-0 w-full h-0.5 bg-slate-100 -z-10"></div>
-
                      {[
                          { icon: Factory, title: "Manufacturing", desc: "Unique QR generation at the source." },
                          { icon: Truck, title: "Distribution", desc: "IoT monitoring during transit." },
@@ -575,14 +555,13 @@ export default function LandingPage() {
              </div>
           </div>
 
-          {/* --- B2B Features (Bento Grid + Global Map) --- */}
+          {/* --- B2B Features --- */}
           <div className="py-24 max-w-7xl mx-auto px-6">
              <div className="text-center mb-20">
                 <h2 className="text-4xl font-black text-slate-900 tracking-tight">Enterprise Solutions</h2>
                 <p className="text-slate-500 mt-3 text-lg">Scalable tools for the modern pharma ecosystem.</p>
              </div>
              
-             {/* Global Map Visualization (Abstract) */}
              <div className="bg-slate-900 rounded-[2.5rem] p-12 text-center relative overflow-hidden mb-12 shadow-2xl">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-900/50 via-slate-900 to-slate-900"></div>
                 <div className="relative z-10">
@@ -611,7 +590,7 @@ export default function LandingPage() {
              </div>
           </div>
 
-          {/* --- B2B Stats Banner --- */}
+          {/* --- B2B Stats --- */}
           <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white py-24">
              <div className="max-w-7xl mx-auto px-6 grid grid-cols-4 gap-12 text-center divide-x divide-white/10">
                 <div><h3 className="text-5xl font-black tracking-tight">99.9%</h3><p className="text-blue-200 mt-2 text-sm uppercase tracking-widest font-bold">Uptime</p></div>
@@ -621,11 +600,10 @@ export default function LandingPage() {
              </div>
           </div>
 
-          {/* --- ✅ NEW: Compliance & Integrations --- */}
+          {/* --- Compliance & Integrations --- */}
           <div className="py-24 bg-slate-50 border-y border-slate-200">
              <div className="max-w-7xl mx-auto px-6">
                  <div className="grid grid-cols-2 gap-16">
-                     {/* Compliance */}
                      <div>
                          <div className="flex items-center gap-2 mb-6">
                              <Award className="text-blue-600"/>
@@ -638,7 +616,6 @@ export default function LandingPage() {
                              <span className="bg-white border border-slate-200 px-4 py-2 rounded-lg font-bold text-slate-600 shadow-sm">DSCSA</span>
                          </div>
                      </div>
-                     {/* Integrations */}
                      <div>
                          <div className="flex items-center gap-2 mb-6">
                              <Layers className="text-blue-600"/>
@@ -655,26 +632,18 @@ export default function LandingPage() {
              </div>
           </div>
 
-          {/* --- ✅ NEW: Testimonials (SCROLLING MARQUEE with SMALL RECTANGULAR CARDS) --- */}
+          {/* --- Testimonials --- */}
           <div className="py-24 bg-white overflow-hidden">
              <div className="max-w-7xl mx-auto px-6">
                  <h2 className="text-3xl font-black text-center text-slate-900 mb-16">Trusted by Pharma Executives</h2>
-                 
                  <div className="relative">
-                     {/* Fades for scrolling effect */}
                      <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-white to-transparent z-10"></div>
                      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-white to-transparent z-10"></div>
-                     
-                     {/* Hover pause logic added to track */}
                      <div className="flex gap-6 animate-scroll hover:pause">
-                         {/* Double the array for seamless infinite scroll */}
                          {[...testimonials, ...testimonials].map((item, i) => (
-                             // ✅ UPDATED: Width is fixed at 260px (Smaller Compact Box)
                              <div key={i} className="w-[260px] min-w-[260px] max-w-[260px] bg-slate-50 p-6 rounded-xl border border-slate-100 relative shadow-sm hover:shadow-md transition flex flex-col hover:-translate-y-1">
                                  <Quote className="text-blue-200 absolute top-4 left-4" size={20}/>
-                                 {/* ✅ Text Handling */}
                                  <p className="text-slate-600 relative z-10 mb-6 mt-6 italic text-xs leading-relaxed font-medium whitespace-normal">"{item.quote}"</p>
-                                 
                                  <div className="flex items-center gap-3 mt-auto pt-4 border-t border-slate-200/50">
                                      <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md shrink-0">
                                          {item.name.charAt(0)}
@@ -691,7 +660,7 @@ export default function LandingPage() {
              </div>
           </div>
 
-          {/* --- Footer (Desktop) --- */}
+          {/* --- Footer --- */}
           <footer className="bg-white py-16 border-t border-slate-200">
              <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
                 <div className="flex items-center gap-3">
