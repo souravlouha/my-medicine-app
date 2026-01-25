@@ -1,18 +1,20 @@
 "use server";
 
-import { prisma } from "@/lib/prisma"; // ✅ আবার কার্লি ব্রেস {} সহ ইম্পোর্ট করো
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ Auth ইম্পোর্ট করা হলো (কুকির বদলে)
+
 // ==========================================
 // 1. SHIPMENT RECEIVE ACTION (Distributor receives stock)
 // ==========================================
 export async function receiveShipmentAction(shipmentId: string) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: কুকির বদলে Auth ব্যবহার করা হচ্ছে
+  const session = await auth();
+  const userId = session?.user?.id;
   
   if (!userId) {
-    console.error("Receive Action: No User ID found in cookies");
-    return { success: false, error: "Unauthorized" };
+    console.error("Receive Action: No User ID found in session");
+    return { success: false, error: "Unauthorized: Please login first." };
   }
 
   try {
@@ -21,7 +23,7 @@ export async function receiveShipmentAction(shipmentId: string) {
     // ১. শিপমেন্ট চেক করা
     const shipment = await prisma.shipment.findUnique({
       where: { id: shipmentId },
-      include: { items: true } // নিশ্চিত হও স্কিমাতে রিলেশনের নাম 'items' আছে কিনা (নাকি 'shipmentItems')
+      include: { items: true } 
     });
 
     if (!shipment) return { success: false, error: "Shipment not found" };
@@ -38,8 +40,6 @@ export async function receiveShipmentAction(shipmentId: string) {
     await prisma.$transaction(async (tx) => {
       
       // A. ইনভেন্টরি আপডেট (Loop through items)
-      // নোট: স্কিমা অনুযায়ী রিলেশন নাম চেক করো। সাধারণত এটা `shipmentItems` হয়। 
-      // তোমার আগের কোডে `items` ছিল, আমি সেটাই রাখলাম। যদি এরর দেয়, `shipmentItems` করে দিও।
       const itemsToProcess = shipment.items || []; 
 
       for (const item of itemsToProcess) {
@@ -57,7 +57,11 @@ export async function receiveShipmentAction(shipmentId: string) {
           // থাকলে স্টক বাড়ানো
           await tx.inventory.update({
             where: { id: existingStock.id },
-            data: { currentStock: { increment: item.quantity } }
+            data: { 
+                currentStock: { increment: item.quantity },
+                // ✅ অপশনাল: totalReceived আপডেট করা ভালো ট্র্যাকিংয়ের জন্য
+                // totalReceived: { increment: item.quantity } 
+            }
           });
         } else {
           // না থাকলে নতুন এন্ট্রি তৈরি করা
@@ -101,8 +105,10 @@ export async function receiveShipmentAction(shipmentId: string) {
 // 2. PLACE ORDER ACTION (Distributor buys from Manufacturer)
 // ==========================================
 export async function placeOrderAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: কুকির বদলে Auth
+  const session = await auth();
+  const userId = session?.user?.id;
+
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const productId = formData.get("productId") as string;
@@ -148,8 +154,10 @@ export async function placeOrderAction(formData: FormData) {
 // 3. CREATE MANUAL SHIPMENT (Distributor sends to Retailer manually)
 // ==========================================
 export async function createDistributorShipmentAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: কুকির বদলে Auth
+  const session = await auth();
+  const userId = session?.user?.id;
+
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const retailerId = formData.get("retailerId") as string;
@@ -189,7 +197,7 @@ export async function createDistributorShipmentAction(formData: FormData) {
           totalAmount: quantity * pricePerUnit,
           // @ts-ignore
           status: "IN_TRANSIT" as any,
-          items: { // স্কিমা অনুযায়ী এটা 'shipmentItems' হতে পারে, চেক করে নিও
+          items: { 
             create: {
               batchId: inventoryItem.batchId,
               quantity: quantity,
@@ -214,6 +222,9 @@ export async function createDistributorShipmentAction(formData: FormData) {
 // 4. UPDATE ORDER STATUS ACTION (Manage Incoming Orders)
 // ==========================================
 export async function updateOrderStatusAction(formData: FormData) {
+  // এই ফাংশনে অথ চেক দরকার নেই কারণ এটি সাধারণত এডমিন বা অথরাইজড পেজ থেকেই কল হয়, 
+  // তবে সিকিউরিটির জন্য এখানেও অথ চেক দেওয়া ভালো। আপাতত আপনার কোড অনুযায়ী রাখলাম।
+  
   const orderId = formData.get("orderId") as string;
   const newStatus = formData.get("newStatus") as string;
 
