@@ -1,11 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth"; // ✅ ফিক্স: কুকির বদলে auth ইম্পোর্ট
+import { auth } from "@/lib/auth"; 
 import { redirect } from "next/navigation";
 import { Truck, Package, User } from "lucide-react";
 import CreateShipmentForm from "./CreateShipmentForm"; 
 
 export default async function CreateShipmentPage() {
-  // ✅ ফিক্স: সেশন চেক (Login Issue Solved)
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -13,13 +12,11 @@ export default async function CreateShipmentPage() {
     redirect("/login");
   }
 
-  // ১. আমার ইনভেন্টরি লোড করা (যাতে স্টক থেকে মাল পাঠাতে পারি)
   const myInventory = await prisma.inventory.findMany({
     where: { userId, currentStock: { gt: 0 } },
     include: { batch: { include: { product: true } } }
   });
 
-  // ২. সব রিটেইলার লোড করা (যাদের কাছে মাল পাঠাবো)
   const retailers = await prisma.user.findMany({
     where: { role: "RETAILER" },
     select: { id: true, name: true, address: true }
@@ -27,7 +24,6 @@ export default async function CreateShipmentPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
-      
       <div className="border-b border-gray-200 pb-5">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
            <Truck className="text-blue-600"/> Dispatch to Retailer
@@ -38,7 +34,6 @@ export default async function CreateShipmentPage() {
       <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
          <CreateShipmentForm inventory={myInventory} retailers={retailers} />
       </div>
-
     </div>
   );
 }

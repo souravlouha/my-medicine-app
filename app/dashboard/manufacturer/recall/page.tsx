@@ -1,14 +1,23 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
-import RecallButton from "./RecallButton"; // Client Component
+import { auth } from "@/lib/auth"; // ✅ কুকির বদলে auth ইম্পোর্ট
+import { redirect } from "next/navigation";
+import RecallButton from "./RecallButton"; 
 
 export default async function RecallPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: সেশন চেক (এটি ব্রাউজার কনফ্লিক্ট কমাবে)
+  const session = await auth();
+  const userId = session?.user?.id;
 
-  // সব ব্যাচ এবং তাদের রিকল স্ট্যাটাস নিয়ে আসা
+  if (!userId) {
+    redirect("/login");
+  }
+
+  // ✅ লজিক: শুধুমাত্র এই ম্যানুফ্যাকচারারের তৈরি করা ব্যাচগুলোই এখানে আসবে।
+  // অন্য কোনো ম্যানুফ্যাকচারারের ডাটা এখানে মিক্স হবে না।
   const batches = await prisma.batch.findMany({
-    where: { manufacturerId: userId },
+    where: { 
+        manufacturerId: userId 
+    },
     include: { product: true, recalls: true },
     orderBy: { createdAt: 'desc' }
   });

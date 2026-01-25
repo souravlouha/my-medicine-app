@@ -1,10 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth"; // ✅ ফিক্স: কুকির বদলে auth ইম্পোর্ট
+import { auth } from "@/lib/auth"; 
 import { redirect } from "next/navigation";
 import { AlertTriangle, ShieldAlert, Search, Info } from "lucide-react";
 
 export default async function DistributorRecallPage() {
-  // ✅ ফিক্স: সেশন চেক (Login Issue Solved)
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -12,17 +11,14 @@ export default async function DistributorRecallPage() {
     redirect("/login");
   }
 
-  // ✅ লজিক: এমন সব রিকল খুঁজে বের করো, যার ব্যাচ আমি (ডিস্ট্রিবিউটর) কখনো রিসিভ করেছি।
-  // স্টক থাকুক বা বিক্রি হয়ে যাক, আমি যেহেতু হ্যান্ডেল করেছি, তাই আমার জানা দরকার।
-  
   const recalls = await prisma.recall.findMany({
     where: {
       batch: {
         shipmentItems: {
           some: {
             shipment: {
-              distributorId: userId, // আমি রিসিভ করেছিলাম এমন ব্যাচ
-              status: { not: 'REJECTED' } // রিজেক্ট করা মাল বাদে
+              distributorId: userId, 
+              status: { not: 'REJECTED' } 
             }
           }
         }
@@ -32,7 +28,7 @@ export default async function DistributorRecallPage() {
       batch: {
         include: {
           product: true,
-          manufacturer: true // কে রিকল দিয়েছে তার নাম জানার জন্য
+          manufacturer: true 
         }
       }
     },
@@ -41,8 +37,6 @@ export default async function DistributorRecallPage() {
 
   return (
     <div className="max-w-7xl mx-auto p-6 pb-20 space-y-8">
-      
-      {/* Header */}
       <div className="bg-red-50 border border-red-100 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center gap-4">
          <div className="p-3 bg-red-100 text-red-600 rounded-xl">
             <ShieldAlert size={32} />
@@ -55,7 +49,6 @@ export default async function DistributorRecallPage() {
          </div>
       </div>
 
-      {/* Recall List */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
          <div className="p-4 border-b border-gray-100 flex gap-4 bg-gray-50/50">
             <div className="relative flex-1 max-w-sm">
