@@ -10,7 +10,7 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 export default function IncomingAnalytics({ shipments }: { shipments: any[] }) {
   
-  // 1. Calculate KPI Metrics
+  // 1. Calculate KPI Metrics (আপনার লজিক)
   const totalValue = shipments.reduce((sum, s) => sum + s.totalAmount, 0);
   const totalItems = shipments.reduce((sum, s) => sum + s.items.length, 0);
 
@@ -75,7 +75,6 @@ export default function IncomingAnalytics({ shipments }: { shipments: any[] }) {
                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                    </Pie>
-                   {/* ✅ FIX: value: number এর বদলে value: any ব্যবহার করা হয়েছে */}
                    <Tooltip 
                       formatter={(value: any) => [`₹${Number(value).toLocaleString()}`, 'Value']}
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '12px' }}
