@@ -1,4 +1,3 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -8,6 +7,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "MedTrace",
   description: "Medicine Authentication System",
+  icons: {
+    icon: "/medtrace-logo.png", // ✅ লোগো আইকন হিসেবে সেট করা হয়েছে
+  },
 };
 
 export default function RootLayout({
@@ -17,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      {/* এই লাইনটা চেঞ্জ করো: suppressHydrationWarning={true} যোগ করো */}
+      {/* ✅ suppressHydrationWarning যোগ করা হয়েছে */}
       <body className={inter.className} suppressHydrationWarning={true}>
         {children}
       </body>

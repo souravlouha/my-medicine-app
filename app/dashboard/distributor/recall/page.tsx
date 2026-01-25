@@ -1,15 +1,19 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ ফিক্স: কুকির বদলে auth ইম্পোর্ট
 import { redirect } from "next/navigation";
 import { AlertTriangle, ShieldAlert, Search, Info } from "lucide-react";
 
 export default async function DistributorRecallPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) redirect("/login");
+  // ✅ ফিক্স: সেশন চেক (Login Issue Solved)
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    redirect("/login");
+  }
 
   // ✅ লজিক: এমন সব রিকল খুঁজে বের করো, যার ব্যাচ আমি (ডিস্ট্রিবিউটর) কখনো রিসিভ করেছি।
-  // স্টক থাকুক বা বিক্রি হয়ে যাক, আমি যেহেতু হ্যান্ডেল করেছি, তাই আমার জানা দরকার।
+  // স্টক থাকুক বা বিক্রি হয়ে যাক, আমি যেহেতু হ্যান্ডেল করেছি, তাই আমার জানা দরকার।
   
   const recalls = await prisma.recall.findMany({
     where: {
@@ -28,7 +32,7 @@ export default async function DistributorRecallPage() {
       batch: {
         include: {
           product: true,
-          manufacturer: true // কে রিকল দিয়েছে তার নাম জানার জন্য
+          manufacturer: true // কে রিকল দিয়েছে তার নাম জানার জন্য
         }
       }
     },

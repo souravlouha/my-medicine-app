@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image"; // ✅ ইমেজ ইম্পোর্ট
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { 
@@ -17,7 +18,7 @@ import {
   Boxes,
   ScanBarcode, 
   Store,
-  Printer // ✅ ১. নতুন আইকন ইম্পোর্ট
+  Printer 
 } from "lucide-react";
 
 export default function Sidebar({ userRole }: { userRole: string }) {
@@ -43,16 +44,32 @@ export default function Sidebar({ userRole }: { userRole: string }) {
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col fixed left-0 top-0 z-50 shadow-sm">
       
-      {/* 1. Logo Section (Updated) */}
+      {/* 1. Logo Section (Updated: Bigger & Bolder) */}
       <div className="p-6 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-            <div className="h-9 w-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-blue-200 shadow-lg">
-            M
+        <Link href={dashboardLink} className="flex items-center gap-4 group">
+            {/* ✅ লোগো সাইজ বড় করা হয়েছে: h-16 w-16 (64px) */}
+            <div className="relative h-16 w-16 min-w-[64px] rounded-full overflow-hidden shadow-md shadow-blue-100 border-2 border-white group-hover:scale-105 transition-transform duration-300">
+               <Image 
+                 src="/medtrace-logo.png" // আপনার public ফোল্ডারের লোগো ফাইলের নাম
+                 alt="MedTrace Logo"
+                 fill
+                 className="object-cover"
+                 priority
+               />
             </div>
-            <span className="text-xl font-bold text-gray-800 tracking-tight">MedTrace</span>
-        </div>
-        {/* ✅ এখানে ডায়নামিক রোল দেখাবে */}
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 ml-12">
+            
+            {/* টেক্সট এবং রোল */}
+            <div className="flex flex-col justify-center">
+               {/* টেক্সট সাইজও একটু বড় করা হয়েছে */}
+               <span className="text-2xl font-black text-gray-800 tracking-tight leading-none block">MedTrace</span>
+               <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-full mt-1 w-fit">
+                  {userRole}
+               </span>
+            </div>
+        </Link>
+        
+        {/* বিস্তারিত রোল লেবেল */}
+        <p className="text-[10px] font-medium text-gray-400 mt-4 text-center border-t border-gray-50 pt-2">
             {getRoleLabel()}
         </p>
       </div>
@@ -98,7 +115,7 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                <Package size={20} /> Product Catalog
              </Link>
 
-             {/* ✅ ৩. নতুন Production & Print লিংক যোগ করা হয়েছে */}
+             {/* ✅ ৩. নতুন Production & Print লিংক */}
              <Link 
                href="/dashboard/manufacturer/production"
                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${

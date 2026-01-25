@@ -4,6 +4,7 @@ import { useState } from "react";
 import { registerAction } from "@/lib/actions/auth-actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image"; // ✅ ইমেজ ইম্পোর্ট
 
 export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,23 @@ export default function RegisterPage() {
       <div className="hidden lg:flex w-1/2 bg-blue-600 justify-center items-center relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-900 opacity-90"></div>
         <div className="relative z-10 text-white p-12 max-w-lg">
-           <h1 className="text-5xl font-bold mb-6">MedTrace 🛡️</h1>
+           
+           {/* ✅ লোগো এবং টাইটেল সেকশন (Fixed Round Shape) */}
+           <div className="flex items-center gap-4 mb-6">
+              {/* overflow-hidden এবং p-1 ব্যবহার করা হয়েছে যাতে চারকোনা ভাব না থাকে */}
+              <div className="bg-white p-1 rounded-full shadow-xl shadow-blue-900/20 overflow-hidden border-2 border-white/20">
+                 <Image 
+                   src="/medtrace-logo.png" 
+                   alt="MedTrace Logo" 
+                   width={64} 
+                   height={64} 
+                   // rounded-full যোগ করা হয়েছে ইমেজে
+                   className="h-16 w-16 object-contain rounded-full"
+                 />
+              </div>
+              <h1 className="text-5xl font-bold tracking-tight">MedTrace</h1>
+           </div>
+
            <p className="text-xl text-blue-100 leading-relaxed mb-6">
              The most secure pharmaceutical supply chain network.
            </p>

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { loginAction } from "@/lib/actions/auth-actions"; 
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // useRouter থাক, কিন্তু আমরা window.location ব্যবহার করব
+import { useRouter } from "next/navigation"; 
 import { Printer } from "lucide-react"; 
+import Image from "next/image"; // ✅ ইমেজ ইম্পোর্ট
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -42,7 +43,21 @@ export default function LoginPage() {
 
         {/* Right Side */}
         <div className="w-full md:w-1/2 p-10">
-           <h3 className="text-2xl font-bold text-gray-800 mb-1">Sign In</h3>
+           
+           {/* ✅ লোগো আরও বড় করা হয়েছে (h-40 / 160px) */}
+           <div className="flex justify-center mb-6">
+              <Image 
+                src="/medtrace-logo.png" 
+                alt="MedTrace Logo" 
+                width={160} // উইডথ বাড়ানো হলো
+                height={160} // হাইট বাড়ানো হলো
+                // h-28 থেকে বাড়িয়ে h-40 করা হয়েছে
+                className="h-40 w-auto object-contain"
+              />
+           </div>
+
+           <h3 className="text-2xl font-bold text-gray-800 mb-1 text-center">Sign In</h3>
+           
            <form onSubmit={handleSubmit} className="space-y-5 mt-8">
              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>

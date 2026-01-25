@@ -1,13 +1,17 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ ফিক্স: কুকির বদলে auth ইম্পোর্ট
 import { redirect } from "next/navigation";
 import { Truck, Package, User } from "lucide-react";
-import CreateShipmentForm from "./CreateShipmentForm"; // 👇 পরের ধাপে বানাচ্ছি
+import CreateShipmentForm from "./CreateShipmentForm"; 
 
 export default async function CreateShipmentPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) redirect("/login");
+  // ✅ ফিক্স: সেশন চেক (Login Issue Solved)
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    redirect("/login");
+  }
 
   // ১. আমার ইনভেন্টরি লোড করা (যাতে স্টক থেকে মাল পাঠাতে পারি)
   const myInventory = await prisma.inventory.findMany({

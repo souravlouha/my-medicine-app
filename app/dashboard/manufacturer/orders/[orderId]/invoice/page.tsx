@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import InvoicePrintButton from "./InvoicePrintButton";
+import Image from "next/image"; // ✅ ইমেজ ইম্পোর্ট
 
 export default async function InvoicePage({ params }: { params: Promise<{ orderId: string }> }) {
     const { orderId } = await params;
@@ -35,7 +36,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ orderI
                         <h1 className="text-3xl font-black text-slate-900 tracking-tight">INVOICE</h1>
                         <p className="text-sm text-gray-500 mt-1 font-mono">#{invoiceId}</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end">
+                        {/* ✅ ইনভয়েস লোগো */}
+                        <Image 
+                           src="/medtrace-logo.png" 
+                           alt="MedTrace Logo" 
+                           width={120} 
+                           height={40} 
+                           className="mb-2 h-10 w-auto object-contain"
+                        />
                         <h2 className="font-bold text-xl text-slate-700">MedTrace Logistics</h2>
                         <p className="text-sm text-gray-500">Automated Supply Chain System</p>
                     </div>
