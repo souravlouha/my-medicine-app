@@ -1,13 +1,13 @@
-import { auth } from "@/lib/auth"; // ✅ Auth added
-import { prisma } from "@/lib/prisma"; // ✅ Using global prisma instance
+import { auth } from "@/lib/auth"; 
+import { prisma } from "@/lib/prisma"; 
 import { redirect } from "next/navigation";
-import { Truck, Package, MapPin, Calendar, AlertCircle, Box } from "lucide-react"; // Added Box icon
-import ReceiveButton from "./ReceiveButton"; // ✅ Button component
+// ✅ ফিক্স: AlertCircle এখানে অ্যাড করা হয়েছে
+import { Truck, Package, Box, MapPin, Calendar, AlertCircle } from "lucide-react";
+import ReceiveButton from "./ReceiveButton"; 
 
 export const dynamic = 'force-dynamic';
 
 export default async function IncomingPage() {
-  // 1. Authentication Check (Security Fix)
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -16,15 +16,14 @@ export default async function IncomingPage() {
   }
 
   try {
-    // 2. Correct Data Fetching (Logic Fix: Only My Shipments)
     const shipments = await prisma.shipment.findMany({
       where: {
-        distributorId: userId, // 🔒 Only for the logged-in distributor
+        distributorId: userId, 
         status: "IN_TRANSIT"
       },
       orderBy: { createdAt: "desc" },
       include: { 
-        sender: true, // Manufacturer Details
+        sender: true, 
         items: { 
           include: { 
             batch: { include: { product: true } } 
@@ -34,102 +33,123 @@ export default async function IncomingPage() {
     });
 
     return (
-      <div className="max-w-5xl mx-auto p-8 pb-24 space-y-8 bg-gray-50/50 min-h-screen">
+      <div className="max-w-6xl mx-auto p-8 pb-24 space-y-8 bg-gray-50/50 min-h-screen">
          
          {/* Header Section */}
-         <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-               Incoming Shipments <Truck className="text-orange-500" size={32} />
-            </h1>
-            <span className="bg-blue-100 text-blue-800 text-sm font-bold px-4 py-2 rounded-full shadow-sm">
+         <div className="flex justify-between items-center">
+            <div>
+               <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
+                  Incoming Shipments <Truck className="text-orange-500" size={32} />
+               </h1>
+               <p className="text-slate-500 mt-2 font-medium">Review and accept stock from manufacturers.</p>
+            </div>
+            <span className="bg-blue-100 text-blue-700 px-5 py-2 rounded-full text-sm font-bold shadow-sm">
                Total Pending: {shipments.length}
             </span>
          </div>
          
          {/* Empty State */}
          {shipments.length === 0 ? (
-           <div className="text-center py-24 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+           <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-gray-300">
              <Package className="mx-auto h-20 w-20 text-slate-200 mb-6" />
              <h3 className="text-xl font-bold text-slate-600">All Caught Up!</h3>
              <p className="text-slate-400 mt-2">No incoming shipments at the moment.</p>
            </div>
          ) : (
-           <div className="grid gap-8">
+           <div className="grid gap-10">
               {shipments.map(shipment => (
-                 // ✅ Card Design matching the 2nd image
-                 <div key={shipment.id} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                 <div key={shipment.id} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition duration-300">
                     
-                    {/* Card Header Information */}
-                    <div className="bg-white p-6 grid grid-cols-1 md:grid-cols-4 gap-6 text-sm border-b border-gray-100">
+                    {/* Card Header Info Grid */}
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 border-b border-gray-100">
+                        
+                        {/* Shipment ID Section (Short + UUID) */}
                         <div>
-                            <p className="text-gray-500 font-bold uppercase text-xs mb-1">Shipment ID</p>
-                            <p className="font-mono text-gray-700 truncate" title={shipment.shipmentId || shipment.id}>
-                                {shipment.shipmentId || shipment.id}
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Shipment ID</p>
+                            <p className="font-bold text-slate-900 text-lg leading-none">
+                                {shipment.shipmentId || "INV-PENDING"}
+                            </p>
+                            <p className="text-[10px] text-gray-400 font-mono mt-1 break-all leading-tight" title="System UUID">
+                                {shipment.id}
                             </p>
                         </div>
+
                         <div>
-                            <p className="text-gray-500 font-bold uppercase text-xs mb-1">Sender (Manufacturer)</p>
-                            <p className="font-bold text-blue-600 text-lg">
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Sender (Manufacturer)</p>
+                            <p className="font-bold text-blue-600 text-lg flex items-center gap-2">
                                 {shipment.sender?.name || "Unknown"}
                             </p>
                         </div>
+
                         <div>
-                            <p className="text-gray-500 font-bold uppercase text-xs mb-1">Total Amount</p>
-                            <p className="font-bold text-green-600 text-lg">
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Total Value</p>
+                            <p className="font-black text-emerald-600 text-lg">
                                 ₹{shipment.totalAmount.toLocaleString()}
                             </p>
                         </div>
+
                         <div>
-                            <p className="text-gray-500 font-bold uppercase text-xs mb-1">Date</p>
+                            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Date</p>
                             <p className="font-bold text-gray-700">
                                 {new Date(shipment.createdAt).toLocaleDateString()}
                             </p>
                         </div>
                     </div>
 
-                    {/* Shipment Contents Section */}
-                    <div className="p-6 bg-gray-50/50">
-                       <h4 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                          <Box size={16} className="text-orange-500"/> SHIPMENT CONTENTS:
-                       </h4>
+                    {/* Shipment Contents */}
+                    <div className="p-8 bg-white">
+                        <h4 className="text-xs font-bold text-orange-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                           <Box size={14}/> Shipment Contents:
+                        </h4>
 
-                       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                          {/* Table Header */}
-                          <div className="grid grid-cols-12 gap-4 bg-gray-100 p-3 text-xs font-bold text-gray-600 uppercase tracking-wider">
-                              <div className="col-span-5">Medicine Name</div>
-                              <div className="col-span-3">Batch No</div>
-                              <div className="col-span-2 text-center">Qty</div>
-                              <div className="col-span-2 text-right">Price</div>
-                          </div>
+                        {/* Table Header */}
+                        <div className="bg-gray-50 rounded-t-lg border-b border-gray-100 p-3 grid grid-cols-12 gap-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                            <div className="col-span-4">Medicine Name</div>
+                            <div className="col-span-4">Batch Details (No & UUID)</div>
+                            <div className="col-span-2 text-center">Qty</div>
+                            <div className="col-span-2 text-right">Price</div>
+                        </div>
 
-                          {/* Table Rows */}
-                          {/* @ts-ignore */}
-                          {shipment.items?.map((item: any) => (
-                             <div key={item.id} className="grid grid-cols-12 gap-4 p-4 border-b border-gray-100 last:border-0 items-center hover:bg-gray-50 transition">
-                                 <div className="col-span-5">
-                                     <p className="font-bold text-gray-800 text-sm">{item.batch.product.name}</p>
-                                     <p className="text-xs text-gray-400 mt-0.5">{item.batch.product.productCode}</p>
-                                 </div>
-                                 <div className="col-span-3">
-                                     <span className="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
-                                        {item.batch.batchNumber}
-                                     </span>
-                                 </div>
-                                 <div className="col-span-2 text-center">
-                                     <span className="font-bold text-gray-800 text-sm">{item.quantity} strips</span>
-                                 </div>
-                                 <div className="col-span-2 text-right">
-                                     <span className="font-medium text-gray-700 text-sm">₹{item.price}</span>
-                                 </div>
-                             </div>
-                          ))}
-                       </div>
+                        {/* Table Body */}
+                        <div className="border border-gray-100 rounded-b-lg divide-y divide-gray-50">
+                            {/* @ts-ignore */}
+                            {shipment.items?.map((item: any) => (
+                                <div key={item.id} className="p-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50/50 transition">
+                                    
+                                    {/* Medicine Name */}
+                                    <div className="col-span-4">
+                                        <p className="font-bold text-slate-800 text-sm">{item.batch.product.name}</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5 font-mono">
+                                            Code: {item.batch.product.productCode || "N/A"}
+                                        </p>
+                                    </div>
 
-                       {/* Action Footer */}
-                       <div className="mt-6 flex justify-end">
-                          {/* ✅ Receive Button Component Call */}
-                          <ReceiveButton shipmentId={shipment.id} />
-                       </div>
+                                    {/* ✅ Batch Details (Batch No + UUID) */}
+                                    <div className="col-span-4 flex flex-col justify-center">
+                                        <span className="bg-gray-100 text-gray-700 border border-gray-200 px-2 py-1 rounded text-xs font-mono font-bold w-fit">
+                                            {item.batch.batchNumber}
+                                        </span>
+                                        {/* UUID এখানে দেখানো হয়েছে */}
+                                        <span className="text-[9px] text-gray-300 font-mono mt-1 truncate max-w-[200px]" title={item.batch.id}>
+                                            {item.batch.id}
+                                        </span>
+                                    </div>
+
+                                    {/* Quantity */}
+                                    <div className="col-span-2 text-center">
+                                        <span className="font-bold text-slate-800 text-sm">{item.quantity} <span className="text-gray-400 text-xs font-normal">strips</span></span>
+                                    </div>
+
+                                    {/* Price */}
+                                    <div className="col-span-2 text-right">
+                                        <span className="font-medium text-gray-600 text-sm">₹{item.price}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Action Button */}
+                        <ReceiveButton shipmentId={shipment.id} />
                     </div>
 
                  </div>
@@ -143,9 +163,10 @@ export default async function IncomingPage() {
     console.error("Database Connection Error:", error);
     return (
       <div className="p-8 max-w-2xl mx-auto mt-10 bg-red-50 border border-red-200 rounded-xl text-center">
+        {/* ✅ AlertCircle এখন কাজ করবে */}
         <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4"/>
         <h3 className="font-bold text-xl text-red-700 mb-2">Error Loading Data</h3>
-        <p className="text-red-600 mb-4">Please check your connection and try again.</p>
+        <p className="text-red-600 mb-4">Connection issue detected.</p>
         <div className="text-left bg-white p-4 rounded border border-red-100 text-xs text-slate-500 font-mono overflow-auto max-h-40">
             {String(error)}
         </div>
