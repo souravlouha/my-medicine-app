@@ -9,7 +9,6 @@ import { auth } from "@/lib/auth"; // ✅ কুকির বদলে auth ই�
 // ==========================================
 
 export async function createProductAction(formData: FormData) {
-  // ✅ ফিক্স: কুকি বাদ দিয়ে সেশন থেকে ইউজার আইডি নেওয়া হচ্ছে
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -42,7 +41,6 @@ export async function createProductAction(formData: FormData) {
 }
 
 export async function updateProductAction(formData: FormData) {
-  // ✅ ফিক্স: সেশন চেক
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -70,7 +68,6 @@ export async function updateProductAction(formData: FormData) {
 }
 
 export async function getProducts() {
-  // ✅ ফিক্স: সেশন চেক
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -85,7 +82,6 @@ export async function getProducts() {
 // ==========================================
 
 export async function createAdvancedBatchAction(formData: FormData) {
-  // ✅ ফিক্স: সেশন চেক
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -105,10 +101,14 @@ export async function createAdvancedBatchAction(formData: FormData) {
   const totalQuantity = totalCartons * boxesPerCarton * stripsPerBox;
 
   try {
-    // A. Auto Batch ID (B-YYYYMM-SEQ)
+    // A. Auto Batch ID Generation (FIXED FOR MULTIPLE USERS)
     const dateStr = new Date().toISOString().slice(0, 7).replace("-", ""); 
     const count = await prisma.batch.count({ where: { manufacturerId: userId } });
-    const autoBatchNumber = `B-${dateStr}-${(count + 1).toString().padStart(3, '0')}`;
+    
+    // ✅ UNIQUE FIX: ইউজারের আইডির শেষ ৪ অক্ষর যোগ করা হলো
+    // এতে করে ভিন্ন ভিন্ন ইউজারের ব্যাচ নম্বর কখনো মিশে যাবে না
+    const uniqueSuffix = userId.slice(-4).toUpperCase();
+    const autoBatchNumber = `B-${dateStr}-${(count + 1).toString().padStart(3, '0')}-${uniqueSuffix}`;
 
     // B. Create Batch
     const batch = await prisma.batch.create({
@@ -135,12 +135,12 @@ export async function createAdvancedBatchAction(formData: FormData) {
     return { success: true, message: `Production Complete! Batch: ${autoBatchNumber}`, batchId: batch.id, batchNo: autoBatchNumber };
 
   } catch (error) {
-    console.error(error);
+    console.error("Production Error:", error);
     return { success: false, error: "Production failed. Please try again." };
   }
 }
 
-// Helper: Hierarchy Generation (No Auth Needed here as it's called internally)
+// Helper: Hierarchy Generation
 export async function createBatchWithHierarchy(
   batchId: string, 
   manufacturerId: string, 
@@ -214,7 +214,7 @@ export async function getDistributors() {
   }
 }
 
-// ✅ NEW LOGIC: Step 1 - Approve Order Only (No Shipment Yet)
+// ✅ Approve Order
 export async function approveOrderAction(formData: FormData) {
   const orderId = formData.get("orderId") as string;
   if (!orderId) return { success: false, error: "Order ID missing" };
@@ -222,7 +222,7 @@ export async function approveOrderAction(formData: FormData) {
   try {
     await prisma.order.update({
       where: { id: orderId },
-      data: { status: "APPROVED" } // PENDING -> APPROVED
+      data: { status: "APPROVED" }
     });
 
     revalidatePath("/dashboard/manufacturer/orders");
@@ -232,8 +232,7 @@ export async function approveOrderAction(formData: FormData) {
   }
 }
 
-// ✅ NEW LOGIC: Step 2 - Ship Approved Order (Generate Invoice & Shipment)
-// ⚠️ WITH TIMEOUT FIX FOR TRANSACTION ERROR
+// ✅ Ship Approved Order
 export async function shipApprovedOrderAction(formData: FormData) {
   const orderId = formData.get("orderId") as string;
   
@@ -246,16 +245,13 @@ export async function shipApprovedOrderAction(formData: FormData) {
     if (!order) throw new Error("Order not found");
     if (order.status !== "APPROVED") throw new Error("Order must be approved first");
 
-    // ✅ Timeout সেট করা হয়েছে ২০ সেকেন্ডে
     await prisma.$transaction(async (tx) => {
-      // A. ইনভয়েস ও শিপমেন্ট আইডি তৈরি
       const invoiceNo = `INV-${Date.now().toString().slice(-6)}`; 
       const shipmentId = `SHP-${Date.now().toString().slice(-6)}`;
       
       let shipmentTotal = 0;
       const shipmentItemsData = [];
 
-      // B. ইনভেন্টরি চেক এবং স্টক কমানো
       for (const item of order.items) {
         const inventoryRecord = await tx.inventory.findFirst({
           where: { 
@@ -269,7 +265,6 @@ export async function shipApprovedOrderAction(formData: FormData) {
 
         if (!inventoryRecord) throw new Error(`Stock mismatch for Product ID: ${item.productId}`);
 
-        // স্টক আপডেট
         await tx.inventory.update({
           where: { id: inventoryRecord.id },
           data: { currentStock: { decrement: item.quantity } }
@@ -283,10 +278,9 @@ export async function shipApprovedOrderAction(formData: FormData) {
         shipmentTotal += (item.quantity * item.price);
       }
 
-      // C. শিপমেন্ট তৈরি (Invoice Number সহ)
       await tx.shipment.create({
         data: {
-          shipmentId: shipmentId, // ট্র্যাকিং আইডি
+          shipmentId: shipmentId,
           manufacturerId: order.receiverId,
           distributorId: order.senderId,
           totalAmount: shipmentTotal,
@@ -295,16 +289,13 @@ export async function shipApprovedOrderAction(formData: FormData) {
         }
       });
 
-      // D. অর্ডার আপডেট
       await tx.order.update({
         where: { id: orderId },
-        data: { 
-          status: "SHIPPED",
-        }
+        data: { status: "SHIPPED" }
       });
     }, {
       maxWait: 5000, 
-      timeout: 20000 // ✅ 20s timeout
+      timeout: 20000
     });
 
     revalidatePath("/dashboard/manufacturer/orders");
@@ -316,7 +307,7 @@ export async function shipApprovedOrderAction(formData: FormData) {
   }
 }
 
-// ✅ REJECT ORDER ACTION
+// ✅ Reject Order
 export async function rejectOrderAction(formData: FormData) {
     const orderId = formData.get("orderId") as string;
     
@@ -336,9 +327,8 @@ export async function rejectOrderAction(formData: FormData) {
     }
 }
 
-// [MANUAL SHIPMENT - OLD LOGIC]
+// [MANUAL SHIPMENT]
 export async function createShipmentAction(formData: FormData) {
-  // ✅ ফিক্স: সেশন চেক
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -351,7 +341,6 @@ export async function createShipmentAction(formData: FormData) {
 
   try {
     await prisma.$transaction(async (tx) => {
-      // Check Stock
       const inventory = await tx.inventory.findFirst({
         where: { userId: userId, batchId: batchId }
       });
@@ -360,7 +349,6 @@ export async function createShipmentAction(formData: FormData) {
         throw new Error("❌ Insufficient Stock!");
       }
 
-      // Create Shipment
       await tx.shipment.create({
         data: {
           shipmentId: `SHP-${Math.floor(10000 + Math.random() * 90000)}`,
@@ -374,7 +362,6 @@ export async function createShipmentAction(formData: FormData) {
         }
       });
 
-      // Reduce Stock
       await tx.inventory.update({
         where: { id: inventory.id },
         data: { currentStock: { decrement: quantity } }
@@ -394,7 +381,6 @@ export async function createShipmentAction(formData: FormData) {
 // ==========================================
 
 export async function recallBatchAction(formData: FormData) {
-  // ✅ ফিক্স: সেশন চেক
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -404,12 +390,10 @@ export async function recallBatchAction(formData: FormData) {
   const reason = formData.get("reason") as string;
 
   try {
-    // 1. Create Recall Record
     await prisma.recall.create({
       data: { batchId, reason, issuedBy: userId, status: "ACTIVE" }
     });
 
-    // 2. Update Units Status
     await prisma.unit.updateMany({
       where: { batchId },
       data: { status: "RECALLED" }
@@ -422,9 +406,8 @@ export async function recallBatchAction(formData: FormData) {
   }
 }
 
-// ✅ BULK SHIPMENT ACTION (Cart System)
+// ✅ BULK SHIPMENT ACTION
 export async function createBulkShipmentAction(formData: FormData) {
-  // ✅ ফিক্স: সেশন চেক
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -490,9 +473,8 @@ export async function createBulkShipmentAction(formData: FormData) {
   }
 }
 
-// ✅ UPDATE PROFILE ACTION
+// ✅ UPDATE PROFILE ACTION (FIXED: GST removed for now)
 export async function updateProfileAction(formData: FormData) {
-  // ✅ ফিক্স: সেশন চেক
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -506,6 +488,7 @@ export async function updateProfileAction(formData: FormData) {
         phone: formData.get("phone") as string,
         address: formData.get("address") as string, 
         licenseNo: formData.get("licenseNo") as string,
+        // GST removed as per request for now
       }
     });
 
