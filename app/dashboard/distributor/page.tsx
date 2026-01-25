@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ কুকির বদলে auth ইম্পোর্ট
 import { redirect } from "next/navigation";
 import ManufacturerHeader from "@/components/dashboard/ManufacturerHeader"; 
 import { Package, Truck, ShoppingCart, DollarSign, ArrowDownLeft, TrendingUp } from "lucide-react";
@@ -8,9 +8,13 @@ import Link from "next/link";
 import { InventoryValueChart, OrderStatusChart } from "./components/DistributorCharts";
 
 export default async function DistributorDashboard() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) redirect("/login");
+  // ✅ ফিক্স: কুকির বদলে সেশন ব্যবহার করা হলো (লগইন সমস্যা সমাধান)
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId) {
+    redirect("/login");
+  }
 
   // =========================================================
   // 1. DATA FETCHING
@@ -90,7 +94,8 @@ export default async function DistributorDashboard() {
     <div className="max-w-7xl mx-auto space-y-8 pb-10 p-6">
       
       {/* Header (Reuse existing header component) */}
-      <ManufacturerHeader user={user} />
+      {/* as any ব্যবহার করা হয়েছে যাতে টাইপ এরর না দেয় */}
+      <ManufacturerHeader user={user as any} />
 
       {/* 🟢 1. KPI STATS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
