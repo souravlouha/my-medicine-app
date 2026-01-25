@@ -2,20 +2,20 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ কুকির বদলে auth ইম্পোর্ট
 
 // ==========================================
 // 1. PRODUCT CATALOG ACTIONS
 // ==========================================
 
 export async function createProductAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: কুকি বাদ দিয়ে সেশন থেকে ইউজার আইডি নেওয়া হচ্ছে
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    // ✅ FIX: ইউনিক কোড জেনারেট করার জন্য টাইমস্ট্যাম্প ব্যবহার করা হলো
-    // এতে কখনো ডুপ্লিকেট কোড তৈরি হবে না (MED-XXXXXX)
     const timestamp = Date.now().toString().slice(-6);
     const randomNum = Math.floor(Math.random() * 99).toString().padStart(2, '0');
     const autoCode = `MED-${timestamp}${randomNum}`;
@@ -25,7 +25,6 @@ export async function createProductAction(formData: FormData) {
         productCode: autoCode,
         name: formData.get("name") as string,
         genericName: formData.get("genericName") as string,
-        // Enum টাইপ ঠিক রাখার জন্য UpperCase করা ভালো
         type: (formData.get("type") as string).toUpperCase() as any,
         strength: formData.get("strength") as string,
         storageTemp: formData.get("storageTemp") as string,
@@ -43,8 +42,10 @@ export async function createProductAction(formData: FormData) {
 }
 
 export async function updateProductAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: সেশন চেক
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const productId = formData.get("productId") as string;
@@ -69,8 +70,10 @@ export async function updateProductAction(formData: FormData) {
 }
 
 export async function getProducts() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: সেশন চেক
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) return [];
   
   return await prisma.product.findMany({ where: { manufacturerId: userId } });
@@ -82,8 +85,10 @@ export async function getProducts() {
 // ==========================================
 
 export async function createAdvancedBatchAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: সেশন চেক
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const productId = formData.get("productId") as string;
@@ -135,7 +140,7 @@ export async function createAdvancedBatchAction(formData: FormData) {
   }
 }
 
-// Helper: Hierarchy Generation
+// Helper: Hierarchy Generation (No Auth Needed here as it's called internally)
 export async function createBatchWithHierarchy(
   batchId: string, 
   manufacturerId: string, 
@@ -320,7 +325,6 @@ export async function rejectOrderAction(formData: FormData) {
     try {
       await prisma.order.update({
         where: { id: orderId },
-        // ✅ FIX: "REJECTED" এর বদলে "CANCELLED" ব্যবহার করা হলো (কারণ স্কিমায় REJECTED নেই)
         data: { status: "CANCELLED" }
       });
   
@@ -334,8 +338,10 @@ export async function rejectOrderAction(formData: FormData) {
 
 // [MANUAL SHIPMENT - OLD LOGIC]
 export async function createShipmentAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: সেশন চেক
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const distributorId = formData.get("distributorId") as string;
@@ -388,8 +394,10 @@ export async function createShipmentAction(formData: FormData) {
 // ==========================================
 
 export async function recallBatchAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: সেশন চেক
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const batchId = formData.get("batchId") as string;
@@ -416,8 +424,10 @@ export async function recallBatchAction(formData: FormData) {
 
 // ✅ BULK SHIPMENT ACTION (Cart System)
 export async function createBulkShipmentAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: সেশন চেক
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const distributorId = formData.get("distributorId") as string;
@@ -482,8 +492,10 @@ export async function createBulkShipmentAction(formData: FormData) {
 
 // ✅ UPDATE PROFILE ACTION
 export async function updateProfileAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  // ✅ ফিক্স: সেশন চেক
+  const session = await auth();
+  const userId = session?.user?.id;
+  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
