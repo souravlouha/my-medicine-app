@@ -2,7 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth"; // ✅ কুকির বদলে auth ইম্পোর্ট
+import { auth } from "@/lib/auth"; 
+import bcrypt from "bcryptjs"; // ✅ পাসওয়ার্ড হ্যাশিং এর জন্য ইম্পোর্ট
 
 // ==========================================
 // 1. PRODUCT CATALOG ACTIONS
@@ -101,12 +102,10 @@ export async function createAdvancedBatchAction(formData: FormData) {
   const totalQuantity = totalCartons * boxesPerCarton * stripsPerBox;
 
   try {
-    // A. Auto Batch ID Generation (FIXED FOR MULTIPLE USERS)
+    // A. Auto Batch ID Generation
     const dateStr = new Date().toISOString().slice(0, 7).replace("-", ""); 
     const count = await prisma.batch.count({ where: { manufacturerId: userId } });
     
-    // ✅ UNIQUE FIX: ইউজারের আইডির শেষ ৪ অক্ষর যোগ করা হলো
-    // এতে করে ভিন্ন ভিন্ন ইউজারের ব্যাচ নম্বর কখনো মিশে যাবে না
     const uniqueSuffix = userId.slice(-4).toUpperCase();
     const autoBatchNumber = `B-${dateStr}-${(count + 1).toString().padStart(3, '0')}-${uniqueSuffix}`;
 
@@ -207,7 +206,7 @@ export async function getDistributors() {
   try {
     return await prisma.user.findMany({
       where: { role: "DISTRIBUTOR" },
-      select: { id: true, name: true, publicId: true, address: true, licenseNo: true }
+      select: { id: true, name: true, publicId: true, address: true, licenseNo: true, gstNo: true }
     });
   } catch (error) {
     return [];
@@ -246,9 +245,7 @@ export async function shipApprovedOrderAction(formData: FormData) {
     if (order.status !== "APPROVED") throw new Error("Order must be approved first");
 
     await prisma.$transaction(async (tx) => {
-      const invoiceNo = `INV-${Date.now().toString().slice(-6)}`; 
       const shipmentId = `SHP-${Date.now().toString().slice(-6)}`;
-      
       let shipmentTotal = 0;
       const shipmentItemsData = [];
 
@@ -298,7 +295,10 @@ export async function shipApprovedOrderAction(formData: FormData) {
       timeout: 20000
     });
 
+    // ✅ ড্যাশবোর্ড আপডেট করা হচ্ছে
+    revalidatePath("/dashboard/manufacturer");
     revalidatePath("/dashboard/manufacturer/orders");
+
     return { success: true, message: "✅ Invoice Generated & Shipment Dispatched!" };
 
   } catch (error: any) {
@@ -368,6 +368,7 @@ export async function createShipmentAction(formData: FormData) {
       });
     });
 
+    // ✅ ড্যাশবোর্ড আপডেট করা হচ্ছে
     revalidatePath("/dashboard/manufacturer");
     return { success: true, message: "✅ Shipment Dispatched!" };
 
@@ -464,7 +465,9 @@ export async function createBulkShipmentAction(formData: FormData) {
       }
     });
 
+    // ✅ ড্যাশবোর্ড আপডেট করা হচ্ছে
     revalidatePath("/dashboard/manufacturer");
+    
     return { success: true, message: "✅ Shipment Confirmed & Saved to Database!" };
 
   } catch (error: any) {
@@ -473,7 +476,7 @@ export async function createBulkShipmentAction(formData: FormData) {
   }
 }
 
-// ✅ UPDATE PROFILE ACTION (FIXED: GST removed for now)
+// ✅ UPDATE PROFILE ACTION
 export async function updateProfileAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -488,7 +491,7 @@ export async function updateProfileAction(formData: FormData) {
         phone: formData.get("phone") as string,
         address: formData.get("address") as string, 
         licenseNo: formData.get("licenseNo") as string,
-        // GST removed as per request for now
+        gstNo: formData.get("gstNo") as string, // ✅ GST Update
       }
     });
 
@@ -496,5 +499,35 @@ export async function updateProfileAction(formData: FormData) {
     return { success: true, message: "✅ Profile Updated Successfully!" };
   } catch (error) {
     return { success: false, error: "Failed to update profile" };
+  }
+}
+
+// ✅ CREATE DISTRIBUTOR ACTION
+export async function createDistributor(formData: FormData) {
+  const name = formData.get("name") as string;
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const licenseNo = formData.get("licenseNo") as string;
+  
+  const gstNo = formData.get("gstNo") as string; 
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword, 
+        role: "DISTRIBUTOR",
+        licenseNo,
+        gstNo: gstNo || null, 
+      },
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Create Distributor Error:", error);
+    return { success: false, error: "Failed to create distributor" };
   }
 }
