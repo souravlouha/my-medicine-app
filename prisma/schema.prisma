@@ -22,6 +22,7 @@ model User {
   // 🏢 Company Profile
   licenseNo     String?  
   licenseExp    DateTime?
+  gstNo         String?  // ✅ NEW: GST Number for Manufacturers, Distributors, Retailers
   address       String?
   phone         String?
   geoLat        Float?     
@@ -34,35 +35,35 @@ model User {
   workers       User[]    @relation("OwnerWorker")
 
   // 🔗 Relations
-  products            Product[]    @relation("ProductOwner")
-  batches             Batch[]      @relation("BatchCreator")
+  products      Product[]    @relation("ProductOwner")
+  batches       Batch[]      @relation("BatchCreator")
    
   // ✅ NEW: Relation for Print Jobs (Assignee/Operator)
-  assignedPrintJobs   PrintJob[]   @relation("JobOperator")
+  assignedPrintJobs PrintJob[]   @relation("JobOperator")
 
   // 📉 Dashboard Data Sources
-  inventory           Inventory[]  
-  sales               SalesRecord[] 
+  inventory     Inventory[]  
+  sales         SalesRecord[] 
    
   // 🚚 Supply Chain
-  sentShipments       Shipment[]   @relation("Sender")
-  receivedShipments   Shipment[]   @relation("Receiver")
+  sentShipments        Shipment[]   @relation("Sender")
+  receivedShipments    Shipment[]   @relation("Receiver")
    
   // 🆕 B2B Ordering
-  placedOrders        Order[]       @relation("PlacedOrders")   // Orders I placed
-  receivedOrders      Order[]       @relation("ReceivedOrders") // Orders I received
+  placedOrders         Order[]        @relation("PlacedOrders")   // Orders I placed
+  receivedOrders       Order[]        @relation("ReceivedOrders") // Orders I received
 
   // 🔔 Alerts & Actions
-  notifications       Notification[] 
-  returnsSent         Return[]      @relation("ReturnSender")
-  returnsReceived     Return[]      @relation("ReturnReceiver")
-  auditLogs           AuditLog[]    
+  notifications        Notification[] 
+  returnsSent          Return[]       @relation("ReturnSender")
+  returnsReceived      Return[]       @relation("ReturnReceiver")
+  auditLogs            AuditLog[]     
 
   // 🔥 Activity Log
-  activityLogs        ActivityLog[]
+  activityLogs         ActivityLog[]
 
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 }
 
 enum Role {
@@ -126,7 +127,7 @@ model Batch {
   expDate         DateTime 
    
   mrp             Float
-  totalQuantity   Int         
+  totalQuantity   Int          
    
   // 🔗 Tracking
   inventory       Inventory[]
@@ -157,7 +158,7 @@ model Inventory {
   batchId         String
   batch           Batch    @relation(fields: [batchId], references: [id])
    
-  currentStock    Int         
+  currentStock    Int          
    
   updatedAt       DateTime @updatedAt
 
@@ -303,9 +304,9 @@ model SalesRecord {
   batchId         String
   batch           Batch    @relation(fields: [batchId], references: [id])
    
-  quantity        Int         
+  quantity        Int          
   totalPrice      Float       
-  buyerType       String?     
+  buyerType       String?      
    
   date            DateTime @default(now())
 
@@ -408,23 +409,23 @@ model AuditLog {
 // 13. GLOBAL SUPPLY CHAIN TRACKING
 // ==========================================
 model BatchMovement {
-  id                  String           @id @default(uuid())
+  id                  String            @id @default(uuid())
    
   batchId             String
-  batch               Batch            @relation(fields: [batchId], references: [id])
+  batch               Batch             @relation(fields: [batchId], references: [id])
    
   senderId            String
-  receiverId          String?           
+  receiverId          String?            
    
   senderName          String
   receiverName        String
    
   role                Role              
   quantity            Int
-  status              String           @default("DELIVERED") 
+  status              String            @default("DELIVERED") 
   location            String?
    
-  parentId            String?           
+  parentId            String?            
   parent              BatchMovement?  @relation("MovementHierarchy", fields: [parentId], references: [id])
   children            BatchMovement[] @relation("MovementHierarchy")
 
@@ -449,7 +450,7 @@ model ActivityLog {
 }
 
 // ==========================================
-// 15. PRODUCTION & PRINT JOBS (NEW)
+// 15. PRODUCTION & PRINT JOBS
 // ==========================================
 model PrintJob {
   id               String       @id @default(uuid())
@@ -462,7 +463,7 @@ model PrintJob {
   operatorId       String?      
   operator         User?        @relation("JobOperator", fields: [operatorId], references: [id])
    
-  machineName      String?      // e.g., "Line-1 Printer"
+  machineName      String?       // e.g., "Line-1 Printer"
    
   targetQuantity   Int          // Total codes to print (e.g., 10,000)
   printedQuantity  Int          @default(0) // Successful prints
@@ -470,8 +471,33 @@ model PrintJob {
   status           String       @default("PENDING") // PENDING, PRINTING, COMPLETED
    
   // 🔐 Security Fields (Time-Bound Access)
-  accessCode       String?      @unique  // 6-digit code
-  accessExpiresAt  DateTime?             // Expiry Time
+  accessCode       String?       @unique  // 6-digit code
+  accessExpiresAt  DateTime?              // Expiry Time
    
   createdAt        DateTime     @default(now())
+}
+
+// ==========================================
+// 16. PUBLIC REPORTS (For Fake Medicine)
+// ==========================================
+model Report {
+  id           String   @id @default(uuid())
+  
+  medicineName String
+  batchNo      String?  // ব্যবহারকারী নাও দিতে পারে
+  location     String
+  description  String
+  
+  imageUrl     String?  // যদি ভবিষ্যতে ছবি সেভ করতে চাও
+  
+  status       ReportStatus @default(PENDING) // PENDING, INVESTIGATING, RESOLVED
+  
+  createdAt    DateTime @default(now())
+}
+
+enum ReportStatus {
+  PENDING
+  INVESTIGATING
+  RESOLVED
+  FALSE_REPORT
 }
