@@ -315,3 +315,27 @@ export function OrderStatusChart({ data }: { data: any[] }) {
     </div>
   );
 }
+// 11. STOCK MOVEMENT CHART (Updated Names)
+export function StockMovementChart({ data }: { data: any[] }) {
+  return (
+    <div className="w-full h-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+          <Tooltip 
+            cursor={{ fill: '#f8fafc' }}
+            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+          />
+          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+          
+          {/* ✅ নামগুলো সহজ করা হলো যাতে ইউজার বোঝে */}
+          <Bar name="Total Received (In)" dataKey="stockIn" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={15} />
+          <Bar name="Total Sold (Out)" dataKey="sales" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={15} />
+        
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
