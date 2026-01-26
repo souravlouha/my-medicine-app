@@ -169,3 +169,27 @@ export function TopProductsChart({ data }: { data: any[] }) {
     </div>
   );
 }
+// ... (আগের কোড যেমন আছে তেমনই থাকবে, শুধু নিচে এটা যোগ করুন)
+
+// 6. PRODUCTION TREND CHART (For Create Batch Page)
+export function ProductionTrendChart({ data }: { data: any[] }) {
+  return (
+    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm h-[350px]">
+      <h3 className="text-lg font-bold text-gray-800 mb-4">🏭 Production Output (Last 7 Days)</h3>
+      <div className="h-[280px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} />
+            <Tooltip 
+              cursor={{fill: '#FFF7ED'}}
+              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+            />
+            <Bar dataKey="quantity" name="Strips Produced" fill="#F97316" radius={[6, 6, 0, 0]} barSize={40} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
