@@ -332,10 +332,15 @@ export default function LandingPage() {
                 </Link>
 
                 <div className="col-span-2 grid grid-rows-2 gap-3 h-36">
-                    <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition" onClick={() => handleFeatureClick('Report')}>
-                       <div className="bg-red-100 text-red-500 p-2 rounded-full"><AlertTriangle size={16}/></div>
-                       <span className="text-xs font-bold text-slate-700">Report Fake</span>
-                    </div>
+                    
+                    {/* ✅ FIX: Report Fake Button Link Added */}
+                    <Link href="/features/report">
+                        <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition h-full cursor-pointer hover:shadow-md">
+                           <div className="bg-red-100 text-red-500 p-2 rounded-full"><AlertTriangle size={16}/></div>
+                           <span className="text-xs font-bold text-slate-700">Report Fake</span>
+                        </div>
+                    </Link>
+
                     <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition">
                        <div className="bg-emerald-100 text-emerald-500 p-2 rounded-full"><Award size={16}/></div>
                        <div>
