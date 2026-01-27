@@ -4,15 +4,14 @@ import { redirect } from "next/navigation";
 import { 
   Package, Truck, ShoppingCart, IndianRupee, TrendingUp, 
   Activity, Clock, Users, Calendar, ArrowDownLeft, AlertTriangle, 
-  Factory, Store, Search, Bell, Download, Zap, Layers 
+  Factory, Store, Search, Bell, Zap, Layers 
 } from "lucide-react";
 import Link from "next/link";
 import { 
   SalesTrendChart, 
   InventoryPieChart, 
   WeeklySalesChart, 
-  StockMovementChart, 
-  TopProductsChart 
+  StockMovementChart 
 } from "@/components/dashboard/DashboardCharts"; 
 
 export const dynamic = "force-dynamic";
@@ -27,11 +26,6 @@ const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-IN', { 
     style: 'currency', currency: 'INR', maximumFractionDigits: 0 
   }).format(amount);
-};
-
-const getIndianDate = (dateInput: Date | string) => {
-  const date = new Date(dateInput);
-  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); 
 };
 
 const getTypeColor = (type: string) => {
@@ -52,26 +46,26 @@ export default async function DistributorDashboard() {
 
   if (!userId) redirect("/login");
 
-  // --- DATA FETCHING (Logic Unchanged) ---
-  const [user, inventory, incomingShipments, purchaseOrders, salesOrders] = await Promise.all([
+  // --- DATA FETCHING ---
+  const [user, inventory, incomingShipments, receivedOrders, salesOrders] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
-    
     prisma.inventory.findMany({ where: { userId }, include: { batch: { include: { product: true } } } }),
     
-    // Stock In (Shipments from Manufacturer)
+    // Stock In
     prisma.shipment.findMany({ 
       where: { distributorId: userId }, 
       orderBy: { createdAt: 'desc' },
       include: { sender: true, items: true } 
     }),
 
-    // PURCHASE Orders
+    // Received Orders (Requests form Retailers)
     prisma.order.findMany({
-      where: { receiverId: userId, status: { not: "CANCELLED" } },
+      where: { receiverId: userId }, 
+      orderBy: { createdAt: 'desc' },
       include: { sender: true } 
     }),
 
-    // SALES Orders
+    // Sales Orders (Orders YOU sent/are sending)
     prisma.order.findMany({ 
       where: { senderId: userId, status: { not: "CANCELLED" } }, 
       orderBy: { createdAt: 'desc' },
@@ -81,34 +75,38 @@ export default async function DistributorDashboard() {
 
   if (!user) return <div>User not found</div>;
 
-  // --- DATA PROCESSING (Logic Unchanged) ---
+  // --- DATA PROCESSING ---
 
   // 1. KPI Metrics
   const totalStock = inventory.reduce((acc, item) => acc + item.currentStock, 0);
   const stockValue = inventory.reduce((acc, item) => acc + (item.currentStock * item.batch.mrp), 0);
   
-  // Total Revenue
+  // Total Revenue (Confirmed Only - For Financial Accuracy)
   const totalRevenue = salesOrders
     .filter(o => o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED")
     .reduce((sum, o) => sum + o.totalAmount, 0);
 
-  const pendingArrivals = incomingShipments.filter(s => s.status === "IN_TRANSIT").length;
-  const pendingOrders = salesOrders.filter(o => o.status === "PENDING").length;
+  // Pending Amount
+  const totalPendingRevenue = salesOrders
+    .filter(o => o.status === "PENDING")
+    .reduce((sum, o) => sum + o.totalAmount, 0);
 
-  // 2. Weekly Sales Performance
+  const pendingArrivals = incomingShipments.filter(s => s.status === "IN_TRANSIT").length;
+  // Pending Orders to process
+  const pendingOrdersCount = receivedOrders.filter(o => o.status === "PENDING").length;
+
+  // 2. Weekly Sales Chart
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const last7DaysMap = new Map();
-
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateKey = getIndianDate(d);
+    const dateKey = d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
     last7DaysMap.set(dateKey, { name: days[d.getDay()], sales: 0 });
   }
-
   salesOrders.forEach(o => {
     if (o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED") {
-        const oDate = getIndianDate(o.createdAt);
+        const oDate = new Date(o.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
         if (last7DaysMap.has(oDate)) {
             const entry = last7DaysMap.get(oDate);
             entry.sales += o.totalAmount;
@@ -118,17 +116,15 @@ export default async function DistributorDashboard() {
   });
   const weeklyChartData = Array.from(last7DaysMap.values());
 
-  // 3. Stock In vs Sales Analysis
+  // 3. Stock In vs Sales Chart
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const stockFlowMap = new Map();
-
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     const monthKey = monthNames[d.getMonth()];
     stockFlowMap.set(monthKey, { name: monthKey, stockIn: 0, sales: 0 }); 
   }
-
   incomingShipments.forEach(s => {
     const mIndex = new Date(s.createdAt).getMonth();
     const mName = monthNames[mIndex];
@@ -139,7 +135,6 @@ export default async function DistributorDashboard() {
       stockFlowMap.set(mName, entry);
     }
   });
-
   salesOrders.forEach(o => {
     if (o.status === "SHIPPED" || o.status === "DELIVERED") {
         const mIndex = new Date(o.createdAt).getMonth();
@@ -153,15 +148,14 @@ export default async function DistributorDashboard() {
     }
   });
   const stockFlowData = Array.from(stockFlowMap.values());
-
   const totalReceivedInPeriod = stockFlowData.reduce((a, b) => a + b.stockIn, 0);
   const totalSoldInPeriod = stockFlowData.reduce((a, b) => a + b.sales, 0);
   const calculatedOpeningStock = totalStock - totalReceivedInPeriod + totalSoldInPeriod;
 
-  // 4. Revenue Trend
+  // 4. Revenue Trend Chart
   const monthlyData = new Array(12).fill(0);
   salesOrders.forEach(o => {
-    if (o.status !== "CANCELLED") {
+    if (o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED") {
         monthlyData[new Date(o.createdAt).getMonth()] += o.totalAmount;
     }
   });
@@ -176,9 +170,10 @@ export default async function DistributorDashboard() {
     return acc;
   }, []);
 
-  // 6. Top Products
+  // ✅ 6. Top Products (FIXED: Includes PENDING orders now)
   const productSales: Record<string, { revenue: number, count: number, type: string }> = {};
   salesOrders.forEach(order => {
+    // 🔴 CHANGE: Now checking if NOT CANCELLED. Including PENDING ensures recent sales show up instantly.
     if (order.status !== "CANCELLED") { 
         order.items.forEach(item => {
             const pName = item.product?.name || "Unknown";
@@ -194,23 +189,38 @@ export default async function DistributorDashboard() {
     .slice(0, 5)
     .map(([name, data]) => ({ name, ...data }));
 
-  // ✅ 7. Recent Activity (Fixed Type Issue)
+  // ✅ 7. Master Activity Feed (FIXED: Includes ALL types of updates)
   const recentActivities = [
+    // A. Stock In
     ...incomingShipments.map(s => ({ 
-        type: 'INCOMING', 
+        type: 'STOCK_IN', 
         date: s.createdAt, 
         title: 'Stock Received', 
-        desc: `From ${s.sender.name} • ₹${s.totalAmount}`,
-        status: s.status // ✅ Added status to fix TS error
+        desc: `From ${s.sender.name} • ${formatCurrency(s.totalAmount)}`,
+        status: s.status 
     })),
+    
+    // B. Sales Out (Includes PENDING/New Orders you created)
     ...salesOrders.filter(o => o.status !== "CANCELLED").map(o => ({ 
-        type: 'ORDER', 
+        type: 'SALE_OUT', 
         date: o.createdAt, 
-        title: o.status === "PENDING" ? "New Order" : o.status === "SHIPPED" ? "Order Shipped" : "Order Processed", 
-        desc: `To ${o.receiver.name} • ₹${o.totalAmount}`,
+        // Dynamic title based on status
+        title: o.status === 'SHIPPED' ? 'Order Shipped' : o.status === 'PENDING' ? 'Sales Order Created' : 'Order Processed', 
+        desc: `To ${o.receiver.name} • ${formatCurrency(o.totalAmount)}`,
         status: o.status 
+    })),
+
+    // C. Requests In (Retailers asking for goods)
+    ...receivedOrders.map(o => ({
+        type: 'REQUEST_IN',
+        date: o.createdAt,
+        title: 'New Retailer Request',
+        desc: `From ${o.sender.name} • ${formatCurrency(o.totalAmount)}`,
+        status: o.status
     }))
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+  ]
+  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  .slice(0, 6);
 
   // 8. Top Manufacturers
   const manuMap: Record<string, number> = {};
@@ -219,19 +229,16 @@ export default async function DistributorDashboard() {
        manuMap[s.sender.name] = (manuMap[s.sender.name] || 0) + s.totalAmount;
     }
   });
-  if (Object.keys(manuMap).length === 0) {
-    purchaseOrders.forEach(o => {
-        if (o.sender.role === 'MANUFACTURER') {
-            manuMap[o.sender.name] = (manuMap[o.sender.name] || 0) + o.totalAmount;
-        }
-    });
-  }
   const topManufacturers = Object.entries(manuMap).sort(([, a], [, b]) => b - a).slice(0, 4).map(([name, amount]) => ({ name, amount }));
 
-  // 9. Top Retailers
+  // ✅ 9. Top Retailers (FIXED: Strict Role Check & Includes Pending)
   const retailMap: Record<string, number> = {};
   salesOrders.forEach(o => {
-    const role = o.receiver.role ? o.receiver.role.toUpperCase() : "";
+    // Force uppercase check for role
+    const role = o.receiver.role ? o.receiver.role.toUpperCase() : "UNKNOWN";
+    
+    // 🔴 CRITICAL FIX: Only count if role is RETAILER. 
+    // And count even if status is PENDING (so Roy shows up immediately)
     if (role === "RETAILER" && o.status !== "CANCELLED") {
         retailMap[o.receiver.name] = (retailMap[o.receiver.name] || 0) + o.totalAmount;
     }
@@ -242,17 +249,15 @@ export default async function DistributorDashboard() {
   const lowStockItems = inventory.filter(item => item.currentStock < 50).slice(0, 3);
 
   // =========================================================
-  // 3. UI RENDER (MODERN BENTO GRID)
+  // 3. UI RENDER
   // =========================================================
   return (
     <div className="min-h-screen bg-slate-50/80 p-6 md:p-8 font-sans text-slate-800">
       <div className="max-w-[1600px] mx-auto space-y-8">
         
-        {/* --- 1. HERO HEADER --- */}
+        {/* --- HERO HEADER --- */}
         <div className="bg-white rounded-[32px] p-8 shadow-xl shadow-slate-200/50 border border-white flex flex-col md:flex-row justify-between items-center relative overflow-hidden">
-           {/* Decorative Background */}
            <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-           
            <div className="relative z-10">
               <div className="flex items-center gap-2 text-indigo-500 mb-2 text-xs font-bold uppercase tracking-wider">
                  <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span> Distributor Portal
@@ -262,13 +267,11 @@ export default async function DistributorDashboard() {
               </h1>
               <p className="text-slate-500 font-medium">Your supply chain is active. Here is today's overview.</p>
            </div>
-
-           {/* Quick Actions */}
            <div className="relative z-10 flex gap-3 mt-6 md:mt-0">
               <button className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition shadow-sm"><Search size={20}/></button>
               <button className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition shadow-sm relative">
                  <Bell size={20}/>
-                 {pendingOrders > 0 && <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-100"></span>}
+                 {pendingOrdersCount > 0 && <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-100"></span>}
               </button>
               <Link href="/dashboard/distributor/place-order" className="flex items-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-900/20 active:scale-95">
                  <ShoppingCart size={18}/> Place Order
@@ -276,19 +279,23 @@ export default async function DistributorDashboard() {
            </div>
         </div>
 
-        {/* --- 2. BENTO GRID - KPI --- */}
+        {/* --- KPI STATS --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
            <KPICard title="Confirmed Sales" value={formatCurrency(totalRevenue)} icon={<IndianRupee size={24}/>} color="green"/>
            <KPICard title="Inventory Value" value={formatCurrency(stockValue)} icon={<Activity size={24}/>} color="blue"/>
            <KPICard title="Stock Units" value={totalStock.toLocaleString()} sub="Available" icon={<Package size={24}/>} color="violet"/>
            <KPICard title="Incoming" value={pendingArrivals.toString()} sub="Shipments" icon={<ArrowDownLeft size={24}/>} color="orange"/>
-           <KPICard title="Pending Orders" value={pendingOrders.toString()} sub="Action Needed" icon={<ShoppingCart size={24}/>} color="purple"/>
+           <KPICard 
+              title="Pending Requests" 
+              value={formatCurrency(totalPendingRevenue)} 
+              sub={`${pendingOrdersCount} Orders Waiting`}
+              icon={<ShoppingCart size={24}/>} 
+              color="purple"
+           />
         </div>
 
-        {/* --- 3. MAIN ANALYTICS ROW --- */}
+        {/* --- MAIN ANALYTICS ROW --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-           
-           {/* Revenue Trend (8 Cols) */}
            <div className="lg:col-span-8 bg-white p-8 rounded-[32px] shadow-sm border border-slate-100">
               <div className="flex justify-between items-center mb-6">
                  <div>
@@ -302,11 +309,9 @@ export default async function DistributorDashboard() {
               <div className="h-[320px] w-full"><SalesTrendChart data={trendChartData} /></div>
            </div>
 
-           {/* Inventory Mix (4 Cols) */}
            <div className="lg:col-span-4 bg-white p-8 rounded-[32px] shadow-sm border border-slate-100 flex flex-col">
               <h3 className="text-lg font-bold text-slate-800 mb-1">Stock Distribution</h3>
               <p className="text-sm text-slate-400 mb-4">By Medicine Type</p>
-              
               <div className="flex-1 relative flex items-center justify-center min-h-[200px]">
                  <InventoryPieChart data={typeDistribution} />
                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -314,7 +319,6 @@ export default async function DistributorDashboard() {
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Types</span>
                  </div>
               </div>
-              
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                  {typeDistribution.slice(0, 4).map((t: any, i: number) => (
                     <span key={i} className="text-[10px] font-bold px-2 py-1 bg-slate-50 rounded-md text-slate-600 border border-slate-200 uppercase">{t.name}</span>
@@ -323,25 +327,24 @@ export default async function DistributorDashboard() {
            </div>
         </div>
 
-        {/* --- 4. SECONDARY ROW --- */}
+        {/* --- SECONDARY ROW --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-           
-           {/* Weekly Sales (6 Cols) */}
            <div className="lg:col-span-6 bg-white p-8 rounded-[32px] shadow-sm border border-slate-100">
               <h3 className="text-lg font-bold text-slate-800 mb-2">Weekly Performance</h3>
               <p className="text-sm text-slate-400 mb-6">Sales volume (last 7 days)</p>
               <div className="h-[300px] w-full"><WeeklySalesChart data={weeklyChartData} /></div>
            </div>
 
-           {/* Top Products (6 Cols) */}
            <div className="lg:col-span-6 bg-white p-8 rounded-[32px] shadow-sm border border-slate-100">
               <div className="flex items-center gap-3 mb-8">
                  <div className="p-2 bg-pink-50 text-pink-500 rounded-lg"><Zap size={20}/></div>
                  <h3 className="text-lg font-bold text-slate-800">Top Selling Products</h3>
               </div>
-              
               <div className="space-y-4">
-                 {topProducts.map((p, i) => (
+                 {topProducts.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-sm font-medium">No sales data yet</div>
+                 ) : (
+                    topProducts.map((p, i) => (
                     <div key={i} className="flex items-center gap-4 p-3 rounded-2xl border border-slate-100 hover:border-slate-300 hover:shadow-md transition group bg-slate-50/30">
                        <div className="h-10 w-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-700 font-bold text-sm border border-slate-100">
                           #{i+1}
@@ -358,12 +361,48 @@ export default async function DistributorDashboard() {
                           <p className="font-black text-slate-900 text-sm">{formatCurrency(p.revenue)}</p>
                        </div>
                     </div>
-                 ))}
+                 )))}
               </div>
            </div>
         </div>
 
-        {/* --- 5. BOTTOM GRID --- */}
+        {/* --- INVENTORY FLOW --- */}
+        <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-100">
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 gap-6">
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Activity className="text-violet-500" size={20} /> Inventory Flow Analysis
+                    </h3>
+                    <p className="text-sm text-slate-400 mt-1">Inflow (Purchase) vs Outflow (Sales) - Last 6 Months</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 md:gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
+                    <div className="text-center min-w-[80px]">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Previous</p>
+                        <p className="text-base font-bold text-slate-600">{calculatedOpeningStock > 0 ? calculatedOpeningStock : 0}</p>
+                    </div>
+                    <span className="text-slate-400 font-bold text-lg">+</span>
+                    <div className="text-center min-w-[80px]">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Received</p>
+                        <p className="text-base font-bold text-violet-600">{totalReceivedInPeriod}</p>
+                    </div>
+                    <span className="text-slate-400 font-bold text-lg">-</span>
+                    <div className="text-center min-w-[80px]">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Sold</p>
+                        <p className="text-base font-bold text-blue-600">{totalSoldInPeriod}</p>
+                    </div>
+                    <span className="text-slate-400 font-bold text-lg">=</span>
+                    <div className="bg-white px-4 py-2 rounded-xl border border-slate-200 text-center min-w-[90px] shadow-sm">
+                        <p className="text-[10px] font-bold text-green-600 uppercase tracking-wide">Available</p>
+                        <p className="text-lg font-black text-slate-800">{totalStock}</p>
+                    </div>
+                </div>
+            </div>
+            <div className="h-[350px] w-full">
+                <StockMovementChart data={stockFlowData} />
+            </div>
+        </div>
+
+        {/* --- BOTTOM GRID --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
            
            {/* Action Required */}
@@ -390,8 +429,14 @@ export default async function DistributorDashboard() {
               <div className="space-y-6 relative border-l-2 border-slate-100 ml-2">
                  {recentActivities.map((act, i) => (
                     <div key={i} className="pl-5 relative">
-                       <div className={`absolute -left-[7px] top-1 w-3 h-3 rounded-full border-2 border-white shadow-sm ${act.type === 'INCOMING' ? 'bg-orange-500' : 'bg-blue-500'}`}></div>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{new Date(act.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                       {/* Dynamic Dot Color based on Type */}
+                       <div className={`absolute -left-[7px] top-1 w-3 h-3 rounded-full border-2 border-white shadow-sm 
+                          ${act.type === 'STOCK_IN' ? 'bg-orange-500' : 
+                            act.type === 'REQUEST_IN' ? 'bg-purple-500' : 'bg-blue-500'}`}>
+                       </div>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                          {new Date(act.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                       </p>
                        <p className="text-xs font-bold text-slate-800">{act.title}</p>
                        <p className="text-[10px] text-slate-500 truncate">{act.desc}</p>
                     </div>
@@ -405,12 +450,15 @@ export default async function DistributorDashboard() {
                  <Factory size={20} className="text-violet-500"/> Top Suppliers
               </h3>
               <div className="space-y-3">
-                 {topManufacturers.map((p, i) => (
+                 {topManufacturers.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-8"><p className="font-bold text-sm">No purchases yet</p></div>
+                 ) : (
+                   topManufacturers.map((p, i) => (
                     <div key={i} className="flex justify-between items-center p-2 rounded-xl bg-slate-50 border border-slate-100">
                        <span className="text-xs font-bold text-slate-700">{p.name}</span>
                        <span className="text-[10px] font-mono text-violet-600 font-bold">{formatCurrency(p.amount)}</span>
                     </div>
-                 ))}
+                 )))}
               </div>
            </div>
 
@@ -421,12 +469,15 @@ export default async function DistributorDashboard() {
                  <Store size={20}/> Top Retailers
               </h3>
               <div className="space-y-3 relative z-10">
-                 {topRetailers.map((p, i) => (
+                 {topRetailers.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-8"><p className="font-bold text-sm">No sales yet</p></div>
+                 ) : (
+                   topRetailers.map((p, i) => (
                     <div key={i} className="flex justify-between items-center p-2 rounded-xl bg-white/10 border border-white/5 backdrop-blur-sm">
                        <span className="text-xs font-bold">{p.name}</span>
                        <span className="text-[10px] font-mono text-emerald-400">{formatCurrency(p.amount)}</span>
                     </div>
-                 ))}
+                 )))}
               </div>
            </div>
 
