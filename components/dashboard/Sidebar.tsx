@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image"; // ✅ ইমেজ ইম্পোর্ট
+import Image from "next/image"; 
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth-actions";
 import { 
@@ -17,7 +17,6 @@ import {
   ShoppingBag,
   Boxes,
   ScanBarcode, 
-  Store,
   Printer 
 } from "lucide-react";
 
@@ -30,7 +29,7 @@ export default function Sidebar({ userRole }: { userRole: string }) {
   else if (userRole === "DISTRIBUTOR") dashboardLink = "/dashboard/distributor";
   else if (userRole === "RETAILER") dashboardLink = "/dashboard/retailer";
 
-  // ✅ ২. ডায়নামিক রোল লেবেল লজিক
+  // ডায়নামিক রোল লেবেল লজিক
   const getRoleLabel = () => {
     if (userRole === "MANUFACTURER") return "Trusted Manufacturer";
     if (userRole === "DISTRIBUTOR") return "Authorized Distributor";
@@ -44,13 +43,12 @@ export default function Sidebar({ userRole }: { userRole: string }) {
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col fixed left-0 top-0 z-50 shadow-sm">
       
-      {/* 1. Logo Section (Updated: Bigger & Bolder) */}
+      {/* 1. Logo Section */}
       <div className="p-6 border-b border-gray-100">
         <Link href={dashboardLink} className="flex items-center gap-4 group">
-            {/* ✅ লোগো সাইজ বড় করা হয়েছে: h-16 w-16 (64px) */}
             <div className="relative h-16 w-16 min-w-[64px] rounded-full overflow-hidden shadow-md shadow-blue-100 border-2 border-white group-hover:scale-105 transition-transform duration-300">
                <Image 
-                 src="/medtrace-logo.png" // আপনার public ফোল্ডারের লোগো ফাইলের নাম
+                 src="/medtrace-logo.png" 
                  alt="MedTrace Logo"
                  fill
                  className="object-cover"
@@ -58,9 +56,7 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                />
             </div>
             
-            {/* টেক্সট এবং রোল */}
             <div className="flex flex-col justify-center">
-               {/* টেক্সট সাইজও একটু বড় করা হয়েছে */}
                <span className="text-2xl font-black text-gray-800 tracking-tight leading-none block">MedTrace</span>
                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-full mt-1 w-fit">
                   {userRole}
@@ -68,7 +64,6 @@ export default function Sidebar({ userRole }: { userRole: string }) {
             </div>
         </Link>
         
-        {/* বিস্তারিত রোল লেবেল */}
         <p className="text-[10px] font-medium text-gray-400 mt-4 text-center border-t border-gray-50 pt-2">
             {getRoleLabel()}
         </p>
@@ -81,7 +76,7 @@ export default function Sidebar({ userRole }: { userRole: string }) {
         <Link 
           href={dashboardLink} 
           className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
-            pathname === dashboardLink // Dashboard link should perform exact match
+            pathname === dashboardLink 
               ? "bg-blue-50 text-blue-700 shadow-sm" 
               : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
           }`}
@@ -115,7 +110,6 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                <Package size={20} /> Product Catalog
              </Link>
 
-             {/* ✅ ৩. নতুন Production & Print লিংক */}
              <Link 
                href="/dashboard/manufacturer/production"
                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
@@ -138,8 +132,8 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                href="/dashboard/manufacturer/inventory"
                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
                  isActive("/dashboard/manufacturer/inventory") 
-                    ? "bg-blue-50 text-blue-700 shadow-sm" 
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                   ? "bg-blue-50 text-blue-700 shadow-sm" 
+                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                }`}
              >
                <Boxes size={20} /> My Inventory
@@ -226,7 +220,7 @@ export default function Sidebar({ userRole }: { userRole: string }) {
            </>
         )}
 
-        {/* 🏪 RETAILER LINKS */}
+        {/* 🏪 RETAILER LINKS (UPDATED) */}
         {userRole === "RETAILER" && (
            <>
              <div className="px-4 mt-6 mb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Store Management</div>
@@ -269,6 +263,16 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                }`}
              >
                <Truck size={20} /> Incoming Stock
+             </Link>
+
+             {/* ✅ 5. NEW: Quality & Recall Link */}
+             <Link 
+               href="/dashboard/retailer/recalls" // Ensure this matches your page path
+               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
+                 isActive("/dashboard/retailer/recalls") ? "bg-red-50 text-red-700 shadow-sm" : "text-gray-600 hover:bg-red-50 hover:text-red-700"
+               }`}
+             >
+               <AlertTriangle size={20} /> Quality & Recall
              </Link>
            </>
         )}

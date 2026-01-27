@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { 
   Package, Truck, ShoppingCart, IndianRupee, TrendingUp, 
   Activity, Clock, Users, Calendar, ArrowDownLeft, AlertTriangle, 
-  Factory, Store, Search, Bell, Zap, Layers 
+  Factory, Store, Search, Bell, Zap, Layers, ArrowUpRight 
 } from "lucide-react";
 import Link from "next/link";
 import { 
@@ -26,6 +26,11 @@ const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-IN', { 
     style: 'currency', currency: 'INR', maximumFractionDigits: 0 
   }).format(amount);
+};
+
+const getIndianDate = (dateInput: Date | string) => {
+  const date = new Date(dateInput);
+  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); 
 };
 
 const getTypeColor = (type: string) => {
@@ -51,21 +56,21 @@ export default async function DistributorDashboard() {
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.inventory.findMany({ where: { userId }, include: { batch: { include: { product: true } } } }),
     
-    // Stock In
+    // Stock In (Shipments from Manufacturer)
     prisma.shipment.findMany({ 
       where: { distributorId: userId }, 
       orderBy: { createdAt: 'desc' },
       include: { sender: true, items: true } 
     }),
 
-    // Received Orders (Requests form Retailers)
+    // Received Orders (Retailer requests YOU)
     prisma.order.findMany({
       where: { receiverId: userId }, 
       orderBy: { createdAt: 'desc' },
       include: { sender: true } 
     }),
 
-    // Sales Orders (Orders YOU sent/are sending)
+    // Sales Orders (You send to Retailer)
     prisma.order.findMany({ 
       where: { senderId: userId, status: { not: "CANCELLED" } }, 
       orderBy: { createdAt: 'desc' },
@@ -81,32 +86,32 @@ export default async function DistributorDashboard() {
   const totalStock = inventory.reduce((acc, item) => acc + item.currentStock, 0);
   const stockValue = inventory.reduce((acc, item) => acc + (item.currentStock * item.batch.mrp), 0);
   
-  // Total Revenue (Confirmed Only - For Financial Accuracy)
+  // Total Revenue (Only Confirmed - Money actually received/confirmed)
   const totalRevenue = salesOrders
     .filter(o => o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED")
     .reduce((sum, o) => sum + o.totalAmount, 0);
 
-  // Pending Amount
+  // Pending Amount Calculation
   const totalPendingRevenue = salesOrders
     .filter(o => o.status === "PENDING")
     .reduce((sum, o) => sum + o.totalAmount, 0);
 
   const pendingArrivals = incomingShipments.filter(s => s.status === "IN_TRANSIT").length;
-  // Pending Orders to process
+  // Pending Orders to process (from retailers)
   const pendingOrdersCount = receivedOrders.filter(o => o.status === "PENDING").length;
 
-  // 2. Weekly Sales Chart
+  // 2. Weekly Sales (Strict: Confirmed Only for financial charts)
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const last7DaysMap = new Map();
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateKey = d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    const dateKey = getIndianDate(d);
     last7DaysMap.set(dateKey, { name: days[d.getDay()], sales: 0 });
   }
   salesOrders.forEach(o => {
     if (o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED") {
-        const oDate = new Date(o.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+        const oDate = getIndianDate(o.createdAt);
         if (last7DaysMap.has(oDate)) {
             const entry = last7DaysMap.get(oDate);
             entry.sales += o.totalAmount;
@@ -116,7 +121,7 @@ export default async function DistributorDashboard() {
   });
   const weeklyChartData = Array.from(last7DaysMap.values());
 
-  // 3. Stock In vs Sales Chart
+  // 3. Stock In vs Sales (Strict: Only Shipped items leave stock)
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const stockFlowMap = new Map();
   for (let i = 5; i >= 0; i--) {
@@ -152,7 +157,7 @@ export default async function DistributorDashboard() {
   const totalSoldInPeriod = stockFlowData.reduce((a, b) => a + b.sales, 0);
   const calculatedOpeningStock = totalStock - totalReceivedInPeriod + totalSoldInPeriod;
 
-  // 4. Revenue Trend Chart
+  // 4. Revenue Trend (Strict: Confirmed Only)
   const monthlyData = new Array(12).fill(0);
   salesOrders.forEach(o => {
     if (o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED") {
@@ -170,10 +175,11 @@ export default async function DistributorDashboard() {
     return acc;
   }, []);
 
-  // ✅ 6. Top Products (FIXED: Includes PENDING orders now)
+  // ✅ 6. Top Products (FIXED: NOW INCLUDES PENDING)
+  // Logic changed to include PENDING orders so you can see immediate demand.
   const productSales: Record<string, { revenue: number, count: number, type: string }> = {};
   salesOrders.forEach(order => {
-    // 🔴 CHANGE: Now checking if NOT CANCELLED. Including PENDING ensures recent sales show up instantly.
+    // 🔴 FIX: Check if NOT CANCELLED. Including PENDING ensures recent sales show up instantly.
     if (order.status !== "CANCELLED") { 
         order.items.forEach(item => {
             const pName = item.product?.name || "Unknown";
@@ -191,7 +197,7 @@ export default async function DistributorDashboard() {
 
   // ✅ 7. Master Activity Feed (FIXED: Includes ALL types of updates)
   const recentActivities = [
-    // A. Stock In
+    // A. Stock In (Incoming Shipments)
     ...incomingShipments.map(s => ({ 
         type: 'STOCK_IN', 
         date: s.createdAt, 
@@ -286,7 +292,7 @@ export default async function DistributorDashboard() {
            <KPICard title="Stock Units" value={totalStock.toLocaleString()} sub="Available" icon={<Package size={24}/>} color="violet"/>
            <KPICard title="Incoming" value={pendingArrivals.toString()} sub="Shipments" icon={<ArrowDownLeft size={24}/>} color="orange"/>
            <KPICard 
-              title="Pending Requests" 
+              title="Pending Value" 
               value={formatCurrency(totalPendingRevenue)} 
               sub={`${pendingOrdersCount} Orders Waiting`}
               icon={<ShoppingCart size={24}/>} 
