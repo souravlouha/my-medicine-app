@@ -1,16 +1,21 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth"; // ✅ Auth ইম্পোর্ট করা হয়েছে
 import { redirect } from "next/navigation";
 import { ShoppingBag, Search, Filter, Clock, CheckCircle, Truck, XCircle } from "lucide-react";
 
 export default async function RetailerOrdersPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) redirect("/login");
+  // ✅ ১. অথেনটিকেশন চেক (Auth Check)
+  const session = await auth();
+  const userId = session?.user?.id;
 
-  // ১. আমার (রিটেইলারের) করা সব অর্ডার ফেচ করা
+  // যদি ইউজার লগইন না থাকে, লগইন পেজে পাঠিয়ে দেবে
+  if (!userId) {
+    redirect("/login");
+  }
+
+  // ২. আমার (রিটেইলারের) করা সব অর্ডার ফেচ করা
   const orders = await prisma.order.findMany({
-    where: { senderId: userId }, // আমি পাঠিয়েছি এমন অর্ডার
+    where: { senderId: userId }, // আমি পাঠিয়েছি এমন অর্ডার
     include: {
       receiver: true, // ডিস্ট্রিবিউটরের তথ্য
       items: {

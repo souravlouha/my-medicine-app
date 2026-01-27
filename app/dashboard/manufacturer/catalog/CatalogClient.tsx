@@ -8,7 +8,6 @@ export default function CatalogClient({ products }: { products: any[] }) {
   const [isEditing, setIsEditing] = useState<any | null>(null); 
   const [loading, setLoading] = useState(false);
 
-  // ✅ Environment Variable (ভবিষ্যতে QR Code এর জন্য লাগতে পারে)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -41,7 +40,7 @@ export default function CatalogClient({ products }: { products: any[] }) {
       <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl border border-gray-100 shadow-sm gap-4">
          <div>
             <h2 className="text-2xl font-bold text-gray-800">📦 Product Inventory</h2>
-            <p className="text-sm text-gray-500">Manage your medicine master catalog</p>
+            <p className="text-sm text-gray-500">Manage your medicine master catalog and set Base Prices.</p>
          </div>
          
          <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-xl">
@@ -68,7 +67,6 @@ export default function CatalogClient({ products }: { products: any[] }) {
         </h3>
         
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-           {/* Auto Code (Disabled) */}
            <div className="opacity-60 pointer-events-none">
              <label className="text-xs font-bold text-gray-400 mb-1 block">Product Code</label>
              <input disabled placeholder={isEditing ? isEditing.productCode : "Auto Generated"} className="w-full p-3 border rounded-xl bg-gray-50 font-mono text-sm" />
@@ -101,12 +99,14 @@ export default function CatalogClient({ products }: { products: any[] }) {
              <input name="strength" defaultValue={isEditing?.strength} placeholder="e.g. 500mg" required className="w-full p-3 border rounded-xl focus:ring-2 ring-blue-500 outline-none" />
            </div>
            
+           {/* ✅ Base Price Input (Distributor Buying Price) */}
            <div>
-             <label className="text-xs font-bold text-gray-500 mb-1 block">Base Price (MRP)</label>
+             <label className="text-xs font-bold text-gray-500 mb-1 block">Base Price (For Distributor)</label>
              <div className="relative">
                <span className="absolute left-4 top-3.5 text-gray-400 font-bold">₹</span>
-               <input name="basePrice" type="number" step="0.01" defaultValue={isEditing?.basePrice} placeholder="0.00" className="w-full pl-8 p-3 border rounded-xl focus:ring-2 ring-blue-500 outline-none font-bold text-gray-700" />
+               <input name="basePrice" type="number" step="0.01" defaultValue={isEditing?.basePrice} placeholder="e.g. 80.00" className="w-full pl-8 p-3 border rounded-xl focus:ring-2 ring-blue-500 outline-none font-bold text-gray-700" />
              </div>
+             <p className="text-[10px] text-gray-400 mt-1">Cost + Manufacturer Profit</p>
            </div>
 
            <div>
@@ -130,7 +130,6 @@ export default function CatalogClient({ products }: { products: any[] }) {
         </div>
       ) : (
         <>
-          {/* GRID VIEW */}
           {viewMode === "grid" && (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {products.map((p) => (
@@ -148,7 +147,7 @@ export default function CatalogClient({ products }: { products: any[] }) {
                   <div className="space-y-2 text-xs text-gray-500 border-t border-gray-100 pt-4">
                     <div className="flex justify-between"><span>Type</span> <span className="font-bold text-gray-700">{p.type}</span></div>
                     <div className="flex justify-between"><span>Strength</span> <span className="font-bold text-gray-700">{p.strength}</span></div>
-                    <div className="flex justify-between"><span>Price</span> <span className="font-bold text-green-600 text-sm">₹{p.basePrice?.toFixed(2) || "N/A"}</span></div>
+                    <div className="flex justify-between"><span>Base Price</span> <span className="font-bold text-green-600 text-sm">₹{p.basePrice?.toFixed(2) || "N/A"}</span></div>
                   </div>
 
                   <button 
@@ -162,7 +161,6 @@ export default function CatalogClient({ products }: { products: any[] }) {
             </div>
           )}
 
-          {/* LIST VIEW */}
           {viewMode === "list" && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <table className="w-full text-left text-sm">
@@ -172,7 +170,7 @@ export default function CatalogClient({ products }: { products: any[] }) {
                     <th className="p-4">Brand Name</th>
                     <th className="p-4">Generic</th>
                     <th className="p-4">Type/Strength</th>
-                    <th className="p-4">Price</th>
+                    <th className="p-4">Base Price</th>
                     <th className="p-4 text-right pr-6">Action</th>
                   </tr>
                 </thead>

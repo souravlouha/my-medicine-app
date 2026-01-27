@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth"; 
-import bcrypt from "bcryptjs"; // ✅ পাসওয়ার্ড হ্যাশিং এর জন্য ইম্পোর্ট
+import bcrypt from "bcryptjs"; 
 
 // ==========================================
 // 1. PRODUCT CATALOG ACTIONS
@@ -28,6 +28,7 @@ export async function createProductAction(formData: FormData) {
         type: (formData.get("type") as string).toUpperCase() as any,
         strength: formData.get("strength") as string,
         storageTemp: formData.get("storageTemp") as string,
+        // ✅ Base Price Save হচ্ছে (Manufacturer Price)
         basePrice: parseFloat(formData.get("basePrice") as string) || 0,
         manufacturerId: userId
       }
@@ -79,7 +80,7 @@ export async function getProducts() {
 
 
 // ==========================================
-// 2. ADVANCED BATCH CREATION (Auto-Calculation Logic)
+// 2. ADVANCED BATCH CREATION
 // ==========================================
 
 export async function createAdvancedBatchAction(formData: FormData) {
@@ -89,45 +90,40 @@ export async function createAdvancedBatchAction(formData: FormData) {
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const productId = formData.get("productId") as string;
+  // ✅ MRP Save হচ্ছে (Consumer Price)
   const mrp = parseFloat(formData.get("mrp") as string);
   const mfgDate = new Date(formData.get("mfgDate") as string);
   const expDate = new Date(formData.get("expDate") as string);
   
-  // Hierarchy Inputs
   const totalCartons = parseInt(formData.get("totalCartons") as string);
   const boxesPerCarton = parseInt(formData.get("boxesPerCarton") as string);
   const stripsPerBox = parseInt(formData.get("stripsPerBox") as string);
 
-  // 🧮 Auto Calculate Total Quantity (Strips)
   const totalQuantity = totalCartons * boxesPerCarton * stripsPerBox;
 
   try {
-    // A. Auto Batch ID Generation
     const dateStr = new Date().toISOString().slice(0, 7).replace("-", ""); 
     const count = await prisma.batch.count({ where: { manufacturerId: userId } });
     
     const uniqueSuffix = userId.slice(-4).toUpperCase();
     const autoBatchNumber = `B-${dateStr}-${(count + 1).toString().padStart(3, '0')}-${uniqueSuffix}`;
 
-    // B. Create Batch
     const batch = await prisma.batch.create({
       data: {
         batchNumber: autoBatchNumber,
         productId,
         manufacturerId: userId,
-        mrp,
+        mrp, // Saved here
         totalQuantity: totalQuantity,
         mfgDate,
         expDate
       }
     });
 
-    // C. Update Inventory
     await prisma.inventory.create({
       data: { userId, batchId: batch.id, currentStock: totalQuantity }
     });
 
-    // D. Generate Hierarchy & QR Units (Loop)
     await createBatchWithHierarchy(batch.id, userId, totalCartons, boxesPerCarton, stripsPerBox, autoBatchNumber);
 
     revalidatePath("/dashboard/manufacturer");
@@ -213,7 +209,6 @@ export async function getDistributors() {
   }
 }
 
-// ✅ Approve Order
 export async function approveOrderAction(formData: FormData) {
   const orderId = formData.get("orderId") as string;
   if (!orderId) return { success: false, error: "Order ID missing" };
@@ -231,7 +226,6 @@ export async function approveOrderAction(formData: FormData) {
   }
 }
 
-// ✅ Ship Approved Order
 export async function shipApprovedOrderAction(formData: FormData) {
   const orderId = formData.get("orderId") as string;
   
@@ -295,7 +289,6 @@ export async function shipApprovedOrderAction(formData: FormData) {
       timeout: 20000
     });
 
-    // ✅ ড্যাশবোর্ড আপডেট করা হচ্ছে
     revalidatePath("/dashboard/manufacturer");
     revalidatePath("/dashboard/manufacturer/orders");
 
@@ -307,7 +300,6 @@ export async function shipApprovedOrderAction(formData: FormData) {
   }
 }
 
-// ✅ Reject Order
 export async function rejectOrderAction(formData: FormData) {
     const orderId = formData.get("orderId") as string;
     
@@ -327,7 +319,6 @@ export async function rejectOrderAction(formData: FormData) {
     }
 }
 
-// [MANUAL SHIPMENT]
 export async function createShipmentAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -368,7 +359,6 @@ export async function createShipmentAction(formData: FormData) {
       });
     });
 
-    // ✅ ড্যাশবোর্ড আপডেট করা হচ্ছে
     revalidatePath("/dashboard/manufacturer");
     return { success: true, message: "✅ Shipment Dispatched!" };
 
@@ -407,7 +397,6 @@ export async function recallBatchAction(formData: FormData) {
   }
 }
 
-// ✅ BULK SHIPMENT ACTION
 export async function createBulkShipmentAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -465,9 +454,7 @@ export async function createBulkShipmentAction(formData: FormData) {
       }
     });
 
-    // ✅ ড্যাশবোর্ড আপডেট করা হচ্ছে
     revalidatePath("/dashboard/manufacturer");
-    
     return { success: true, message: "✅ Shipment Confirmed & Saved to Database!" };
 
   } catch (error: any) {
@@ -476,7 +463,6 @@ export async function createBulkShipmentAction(formData: FormData) {
   }
 }
 
-// ✅ UPDATE PROFILE ACTION
 export async function updateProfileAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -491,7 +477,7 @@ export async function updateProfileAction(formData: FormData) {
         phone: formData.get("phone") as string,
         address: formData.get("address") as string, 
         licenseNo: formData.get("licenseNo") as string,
-        gstNo: formData.get("gstNo") as string, // ✅ GST Update
+        gstNo: formData.get("gstNo") as string, 
       }
     });
 
@@ -502,7 +488,6 @@ export async function updateProfileAction(formData: FormData) {
   }
 }
 
-// ✅ CREATE DISTRIBUTOR ACTION
 export async function createDistributor(formData: FormData) {
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;

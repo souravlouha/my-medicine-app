@@ -33,6 +33,7 @@ my-medicine-app
 │  │  │  │  ├─ InventoryAnalytics.tsx
 │  │  │  │  └─ page.tsx
 │  │  │  ├─ orders
+│  │  │  │  ├─ OrdersView.tsx
 │  │  │  │  └─ page.tsx
 │  │  │  ├─ page.tsx
 │  │  │  ├─ place-order
@@ -100,6 +101,8 @@ my-medicine-app
 │  │  │  ├─ page.tsx
 │  │  │  ├─ pos
 │  │  │  │  └─ page.tsx
+│  │  │  ├─ recalls
+│  │  │  │  └─ page.tsx
 │  │  │  ├─ sales
 │  │  │  │  └─ page.tsx
 │  │  │  └─ shop
@@ -114,7 +117,11 @@ my-medicine-app
 │  ├─ favicon.ico
 │  ├─ features
 │  │  ├─ generic-finder
-│  │  └─ pharmacy-locator
+│  │  ├─ interaction
+│  │  ├─ pharmacy-locator
+│  │  │  └─ page.tsx
+│  │  ├─ prescription
+│  │  └─ report
 │  │     └─ page.tsx
 │  ├─ globals.css
 │  ├─ layout.tsx
@@ -124,13 +131,14 @@ my-medicine-app
 │  │     └─ [code]
 │  │        └─ page.tsx
 │  ├─ page.tsx
+│  ├─ test-session
+│  │  └─ page.tsx
 │  ├─ track
 │  │  ├─ page.tsx
 │  │  └─ TrackClient.tsx
 │  └─ verify
 │     └─ [batchId]
 │        └─ page.tsx
-├─ auth.ts
 ├─ components
 │  ├─ dashboard
 │  │  ├─ activity-log.tsx
@@ -161,18 +169,19 @@ my-medicine-app
 │  │  ├─ production-actions.ts
 │  │  ├─ profile-actions.ts
 │  │  ├─ recall-actions.ts
+│  │  ├─ report-actions.ts
 │  │  ├─ retailer-actions.ts
 │  │  ├─ sales-actions.ts
 │  │  ├─ shipment-actions.ts
 │  │  ├─ team-actions.ts
 │  │  └─ track-actions.ts
 │  ├─ actions.ts
+│  ├─ auth.config.ts
 │  ├─ auth.ts
 │  ├─ formatters.ts
 │  ├─ idGenerator.ts
 │  ├─ prisma.ts
 │  └─ utils.ts
-├─ middleware.ts
 ├─ New folder
 ├─ next.config.ts
 ├─ package-lock.json
@@ -191,6 +200,7 @@ my-medicine-app
 │  ├─ file.svg
 │  ├─ globe.svg
 │  ├─ hero.png
+│  ├─ medtrace-logo.png
 │  ├─ next.svg
 │  ├─ photo-1562243061-204550d8a2c9.jpg
 │  ├─ premium_photo-1664373622064-3847709d4cf9.jpg
@@ -201,6 +211,8 @@ my-medicine-app
 │  ├─ slide3.jpg
 │  ├─ vercel.svg
 │  └─ window.svg
-└─ tsconfig.json
+├─ tsconfig.json
+└─ utils
+   └─ generateInvoice.ts
 
 ```

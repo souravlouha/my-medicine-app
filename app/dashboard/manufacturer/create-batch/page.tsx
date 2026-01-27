@@ -1,39 +1,31 @@
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth"; // ✅ কুকির বদলে auth ইম্পোর্ট
+import { auth } from "@/lib/auth"; 
 import { redirect } from "next/navigation";
 import CreateBatchForm from "./CreateBatchForm";
-// 👇 নতুন চার্ট ও আইকন ইম্পোর্ট
 import { ProductionTrendChart } from "@/components/dashboard/DashboardCharts";
 import { History, BarChart3, PackageCheck } from "lucide-react";
 
 export default async function CreateBatchPage() {
-  // ✅ ফিক্স: কুকি স্টোর বাদ দিয়ে সেশন চেক
   const session = await auth();
   const userId = session?.user?.id;
 
   if (!userId) redirect("/login");
 
-  // =========================================================
-  // 1. EXISTING DATA FETCHING (Form Data)
-  // =========================================================
+  // 1. EXISTING DATA FETCHING
+  // প্রোডাক্ট লিস্ট আনা হচ্ছে যাতে ফর্মের ড্রপডাউনে দেখানো যায়
   const products = await prisma.product.findMany({
     where: { manufacturerId: userId }
   });
 
-  // =========================================================
-  // 2. NEW ANALYTICS DATA (Bottom Section) ✅
-  // =========================================================
-  
-  // A. Last 7 Days Production Data
+  // 2. ANALYTICS DATA
   const last7DaysBatches = await prisma.batch.findMany({
     where: { 
       manufacturerId: userId,
-      createdAt: { gte: new Date(new Date().setDate(new Date().getDate() - 7)) } // Last 7 days
+      createdAt: { gte: new Date(new Date().setDate(new Date().getDate() - 7)) } 
     },
     orderBy: { createdAt: 'asc' }
   });
 
-  // B. Process Data for Chart
   const productionChartData = last7DaysBatches.reduce((acc: any[], curr) => {
     const date = new Date(curr.createdAt).toLocaleDateString('en-US', { weekday: 'short' });
     const existing = acc.find(item => item.date === date);
@@ -42,7 +34,6 @@ export default async function CreateBatchPage() {
     return acc;
   }, []);
 
-  // C. Recent 5 Batches List
   const recentBatches = await prisma.batch.findMany({
     where: { manufacturerId: userId },
     orderBy: { createdAt: 'desc' },
@@ -50,7 +41,6 @@ export default async function CreateBatchPage() {
     include: { product: true }
   });
 
-  // D. Monthly Total (Simple Stat)
   const thisMonthTotal = await prisma.batch.aggregate({
     where: {
       manufacturerId: userId,
@@ -62,7 +52,7 @@ export default async function CreateBatchPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center p-6 space-y-8 pb-20">
       
-      {/* 🟢 TOP SECTION: PRODUCTION FORM (Unchanged) */}
+      {/* PRODUCTION FORM SECTION */}
       <div className="max-w-4xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
         <div className="bg-blue-600 p-6 text-white flex justify-between items-center">
           <div>
@@ -72,28 +62,22 @@ export default async function CreateBatchPage() {
         </div>
         
         <div className="p-8">
-           {/* আপনার বর্তমান ফর্ম কম্পোনেন্ট */}
            <CreateBatchForm products={products} />
         </div>
       </div>
 
-      {/* 🟠 NEW SECTION: PRODUCTION ANALYTICS (Added Below) */}
+      {/* ANALYTICS SECTION */}
       <div className="max-w-4xl w-full">
          <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
             <BarChart3 className="text-orange-500"/> Production Analytics
          </h3>
 
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-           
-           {/* 1. Production Trend Chart */}
            <div className="bg-white p-1 rounded-2xl shadow-sm border border-gray-100 h-full">
               <ProductionTrendChart data={productionChartData} />
            </div>
 
-           {/* 2. Stats & Recent History */}
            <div className="space-y-6">
-              
-              {/* Quick Stat Card */}
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                   <div>
                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">This Month Output</p>
@@ -107,7 +91,6 @@ export default async function CreateBatchPage() {
                   </div>
               </div>
 
-              {/* Recent Batch List */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                   <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
                      <History size={16} className="text-gray-500" />
@@ -131,11 +114,9 @@ export default async function CreateBatchPage() {
                      {recentBatches.length === 0 && <p className="p-6 text-center text-xs text-gray-400">No production history found.</p>}
                   </div>
               </div>
-
            </div>
         </div>
       </div>
-
     </div>
   );
 }

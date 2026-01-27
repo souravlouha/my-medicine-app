@@ -2,13 +2,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth"; // ✅ Auth ইম্পোর্ট করা হলো (কুকির বদলে)
+import { auth } from "@/lib/auth"; 
 
 // ==========================================
 // 1. SHIPMENT RECEIVE ACTION (Distributor receives stock)
 // ==========================================
 export async function receiveShipmentAction(shipmentId: string) {
-  // ✅ ফিক্স: কুকির বদলে Auth ব্যবহার করা হচ্ছে
   const session = await auth();
   const userId = session?.user?.id;
   
@@ -59,8 +58,6 @@ export async function receiveShipmentAction(shipmentId: string) {
             where: { id: existingStock.id },
             data: { 
                 currentStock: { increment: item.quantity },
-                // ✅ অপশনাল: totalReceived আপডেট করা ভালো ট্র্যাকিংয়ের জন্য
-                // totalReceived: { increment: item.quantity } 
             }
           });
         } else {
@@ -69,7 +66,8 @@ export async function receiveShipmentAction(shipmentId: string) {
             data: {
               userId: userId,
               batchId: item.batchId,
-              currentStock: item.quantity
+              currentStock: item.quantity,
+              sellingPrice: 0 // ✅ Default value, distributor will set later
             }
           });
         }
@@ -105,7 +103,6 @@ export async function receiveShipmentAction(shipmentId: string) {
 // 2. PLACE ORDER ACTION (Distributor buys from Manufacturer)
 // ==========================================
 export async function placeOrderAction(formData: FormData) {
-  // ✅ ফিক্স: কুকির বদলে Auth
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -154,7 +151,6 @@ export async function placeOrderAction(formData: FormData) {
 // 3. CREATE MANUAL SHIPMENT (Distributor sends to Retailer manually)
 // ==========================================
 export async function createDistributorShipmentAction(formData: FormData) {
-  // ✅ ফিক্স: কুকির বদলে Auth
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -222,9 +218,6 @@ export async function createDistributorShipmentAction(formData: FormData) {
 // 4. UPDATE ORDER STATUS ACTION (Manage Incoming Orders)
 // ==========================================
 export async function updateOrderStatusAction(formData: FormData) {
-  // এই ফাংশনে অথ চেক দরকার নেই কারণ এটি সাধারণত এডমিন বা অথরাইজড পেজ থেকেই কল হয়, 
-  // তবে সিকিউরিটির জন্য এখানেও অথ চেক দেওয়া ভালো। আপাতত আপনার কোড অনুযায়ী রাখলাম।
-  
   const orderId = formData.get("orderId") as string;
   const newStatus = formData.get("newStatus") as string;
 
@@ -237,11 +230,37 @@ export async function updateOrderStatusAction(formData: FormData) {
       data: { status: newStatus as any } 
     });
 
-    // পেজ রিফ্রেশ করা যাতে UI আপডেট হয়
     revalidatePath("/dashboard/distributor/orders");
     
   } catch (error) {
     console.error("Failed to update order status:", error);
     throw new Error("Failed to update order status");
+  }
+}
+
+// ✅ [NEW] UPDATE SELLING PRICE ACTION (For Distributor Inventory)
+export async function updateSellingPriceAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
+  const inventoryId = formData.get("inventoryId") as string;
+  const price = parseFloat(formData.get("price") as string);
+
+  if (!inventoryId || isNaN(price)) return { success: false, error: "Invalid data" };
+
+  try {
+    await prisma.inventory.update({
+      where: { 
+        id: inventoryId,
+        userId: session.user.id // Security check: Must belong to user
+      },
+      data: { sellingPrice: price }
+    });
+
+    revalidatePath("/dashboard/distributor/inventory");
+    return { success: true, message: "Price updated" };
+  } catch (error) {
+    console.error("Update Price Error:", error);
+    return { success: false, error: "Failed to update price" };
   }
 }

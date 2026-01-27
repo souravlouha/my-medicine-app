@@ -52,29 +52,29 @@ export default async function DistributorDashboard() {
   if (!userId) redirect("/login");
 
   // --- DATA FETCHING ---
-  const [user, inventory, incomingShipments, receivedOrders, salesOrders] = await Promise.all([
+  const [user, inventory, incomingShipments, retailerOrders, myPurchaseOrders] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.inventory.findMany({ where: { userId }, include: { batch: { include: { product: true } } } }),
     
-    // Stock In (Shipments from Manufacturer)
+    // Stock In (Shipments from Manufacturer coming to ME)
     prisma.shipment.findMany({ 
       where: { distributorId: userId }, 
       orderBy: { createdAt: 'desc' },
       include: { sender: true, items: true } 
     }),
 
-    // Received Orders (Retailer requests YOU)
+    // ✅ SALES (Retailer -> Me): I am the Receiver
     prisma.order.findMany({
       where: { receiverId: userId }, 
       orderBy: { createdAt: 'desc' },
-      include: { sender: true } 
+      include: { sender: true, items: { include: { product: true } } } 
     }),
 
-    // Sales Orders (You send to Retailer)
-    prisma.order.findMany({ 
+    // ✅ PURCHASES (Me -> Manufacturer): I am the Sender
+    prisma.order.findMany({
       where: { senderId: userId, status: { not: "CANCELLED" } }, 
       orderBy: { createdAt: 'desc' },
-      include: { receiver: true, items: { include: { product: true } } } 
+      include: { receiver: true }
     })
   ]);
 
@@ -83,24 +83,34 @@ export default async function DistributorDashboard() {
   // --- DATA PROCESSING ---
 
   // 1. KPI Metrics
+  
+  // Inventory Value
   const totalStock = inventory.reduce((acc, item) => acc + item.currentStock, 0);
   const stockValue = inventory.reduce((acc, item) => acc + (item.currentStock * item.batch.mrp), 0);
   
-  // Total Revenue (Only Confirmed - Money actually received/confirmed)
-  const totalRevenue = salesOrders
-    .filter(o => o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED")
+  // ✅ FIX 1: Total Revenue (Sales to Retailers)
+  // লজিক আপডেট: শুধুমাত্র SHIPPED বা DELIVERED হলে টাকা যোগ হবে। APPROVED হলে হবে না।
+  const totalRevenue = retailerOrders
+    .filter(o => o.status === "SHIPPED" || o.status === "DELIVERED")
     .reduce((sum, o) => sum + o.totalAmount, 0);
 
-  // Pending Amount Calculation
-  const totalPendingRevenue = salesOrders
-    .filter(o => o.status === "PENDING")
+  // ✅ Pending Incoming Value
+  const pendingPurchaseValue = myPurchaseOrders
+    .filter(o => o.status === "APPROVED")
     .reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const incomingShipmentValue = incomingShipments
+    .filter(s => s.status === "IN_TRANSIT")
+    .reduce((sum, s) => sum + s.totalAmount, 0);
+
+  const totalPendingInflowValue = pendingPurchaseValue + incomingShipmentValue;
 
   const pendingArrivals = incomingShipments.filter(s => s.status === "IN_TRANSIT").length;
-  // Pending Orders to process (from retailers)
-  const pendingOrdersCount = receivedOrders.filter(o => o.status === "PENDING").length;
+  
+  // Action Needed
+  const pendingRetailerRequestsCount = retailerOrders.filter(o => o.status === "PENDING").length;
 
-  // 2. Weekly Sales (Strict: Confirmed Only for financial charts)
+  // 2. Weekly Sales Chart (Updated Logic)
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const last7DaysMap = new Map();
   for (let i = 6; i >= 0; i--) {
@@ -109,8 +119,9 @@ export default async function DistributorDashboard() {
     const dateKey = getIndianDate(d);
     last7DaysMap.set(dateKey, { name: days[d.getDay()], sales: 0 });
   }
-  salesOrders.forEach(o => {
-    if (o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED") {
+  retailerOrders.forEach(o => {
+    // চার্টেও শুধু কনফার্ম সেলস দেখাবে
+    if (o.status === "SHIPPED" || o.status === "DELIVERED") {
         const oDate = getIndianDate(o.createdAt);
         if (last7DaysMap.has(oDate)) {
             const entry = last7DaysMap.get(oDate);
@@ -121,7 +132,7 @@ export default async function DistributorDashboard() {
   });
   const weeklyChartData = Array.from(last7DaysMap.values());
 
-  // 3. Stock In vs Sales (Strict: Only Shipped items leave stock)
+  // 3. Stock In vs Sales
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const stockFlowMap = new Map();
   for (let i = 5; i >= 0; i--) {
@@ -130,6 +141,8 @@ export default async function DistributorDashboard() {
     const monthKey = monthNames[d.getMonth()];
     stockFlowMap.set(monthKey, { name: monthKey, stockIn: 0, sales: 0 }); 
   }
+  
+  // Stock In
   incomingShipments.forEach(s => {
     const mIndex = new Date(s.createdAt).getMonth();
     const mName = monthNames[mIndex];
@@ -140,7 +153,9 @@ export default async function DistributorDashboard() {
       stockFlowMap.set(mName, entry);
     }
   });
-  salesOrders.forEach(o => {
+
+  // Stock Out (Only Confirmed Sales)
+  retailerOrders.forEach(o => {
     if (o.status === "SHIPPED" || o.status === "DELIVERED") {
         const mIndex = new Date(o.createdAt).getMonth();
         const mName = monthNames[mIndex];
@@ -157,10 +172,10 @@ export default async function DistributorDashboard() {
   const totalSoldInPeriod = stockFlowData.reduce((a, b) => a + b.sales, 0);
   const calculatedOpeningStock = totalStock - totalReceivedInPeriod + totalSoldInPeriod;
 
-  // 4. Revenue Trend (Strict: Confirmed Only)
+  // 4. Revenue Trend
   const monthlyData = new Array(12).fill(0);
-  salesOrders.forEach(o => {
-    if (o.status === "SHIPPED" || o.status === "DELIVERED" || o.status === "APPROVED") {
+  retailerOrders.forEach(o => {
+    if (o.status === "SHIPPED" || o.status === "DELIVERED") {
         monthlyData[new Date(o.createdAt).getMonth()] += o.totalAmount;
     }
   });
@@ -175,12 +190,10 @@ export default async function DistributorDashboard() {
     return acc;
   }, []);
 
-  // ✅ 6. Top Products (FIXED: NOW INCLUDES PENDING)
-  // Logic changed to include PENDING orders so you can see immediate demand.
+  // 6. Top Products (Only Confirmed Sales)
   const productSales: Record<string, { revenue: number, count: number, type: string }> = {};
-  salesOrders.forEach(order => {
-    // 🔴 FIX: Check if NOT CANCELLED. Including PENDING ensures recent sales show up instantly.
-    if (order.status !== "CANCELLED") { 
+  retailerOrders.forEach(order => {
+    if (order.status === "SHIPPED" || order.status === "DELIVERED") { 
         order.items.forEach(item => {
             const pName = item.product?.name || "Unknown";
             const pType = item.product?.type || "medicine";
@@ -195,9 +208,8 @@ export default async function DistributorDashboard() {
     .slice(0, 5)
     .map(([name, data]) => ({ name, ...data }));
 
-  // ✅ 7. Master Activity Feed (FIXED: Includes ALL types of updates)
+  // 7. Activity Feed
   const recentActivities = [
-    // A. Stock In (Incoming Shipments)
     ...incomingShipments.map(s => ({ 
         type: 'STOCK_IN', 
         date: s.createdAt, 
@@ -205,23 +217,25 @@ export default async function DistributorDashboard() {
         desc: `From ${s.sender.name} • ${formatCurrency(s.totalAmount)}`,
         status: s.status 
     })),
-    
-    // B. Sales Out (Includes PENDING/New Orders you created)
-    ...salesOrders.filter(o => o.status !== "CANCELLED").map(o => ({ 
+    ...retailerOrders.filter(o => o.status !== "PENDING").map(o => ({ 
         type: 'SALE_OUT', 
-        date: o.createdAt, 
-        // Dynamic title based on status
-        title: o.status === 'SHIPPED' ? 'Order Shipped' : o.status === 'PENDING' ? 'Sales Order Created' : 'Order Processed', 
-        desc: `To ${o.receiver.name} • ${formatCurrency(o.totalAmount)}`,
+        date: o.updatedAt, 
+        title: o.status === 'SHIPPED' ? 'Order Shipped' : o.status === 'APPROVED' ? 'Order Approved' : 'Order Delivered', 
+        desc: `To ${o.sender.name} • ${formatCurrency(o.totalAmount)}`, 
         status: o.status 
     })),
-
-    // C. Requests In (Retailers asking for goods)
-    ...receivedOrders.map(o => ({
+    ...retailerOrders.filter(o => o.status === "PENDING").map(o => ({
         type: 'REQUEST_IN',
         date: o.createdAt,
         title: 'New Retailer Request',
         desc: `From ${o.sender.name} • ${formatCurrency(o.totalAmount)}`,
+        status: o.status
+    })),
+    ...myPurchaseOrders.map(o => ({
+        type: 'MY_PURCHASE',
+        date: o.createdAt,
+        title: 'Purchase Order Placed',
+        desc: `To ${o.receiver.name} • ${formatCurrency(o.totalAmount)}`,
         status: o.status
     }))
   ]
@@ -235,18 +249,19 @@ export default async function DistributorDashboard() {
        manuMap[s.sender.name] = (manuMap[s.sender.name] || 0) + s.totalAmount;
     }
   });
+  myPurchaseOrders.forEach(o => {
+     if (o.status === "APPROVED" && o.receiver.role === 'MANUFACTURER') {
+        manuMap[o.receiver.name] = (manuMap[o.receiver.name] || 0) + o.totalAmount;
+     }
+  });
   const topManufacturers = Object.entries(manuMap).sort(([, a], [, b]) => b - a).slice(0, 4).map(([name, amount]) => ({ name, amount }));
 
-  // ✅ 9. Top Retailers (FIXED: Strict Role Check & Includes Pending)
+  // ✅ FIX 2: Top Retailers (Strict Role Check)
   const retailMap: Record<string, number> = {};
-  salesOrders.forEach(o => {
-    // Force uppercase check for role
-    const role = o.receiver.role ? o.receiver.role.toUpperCase() : "UNKNOWN";
-    
-    // 🔴 CRITICAL FIX: Only count if role is RETAILER. 
-    // And count even if status is PENDING (so Roy shows up immediately)
-    if (role === "RETAILER" && o.status !== "CANCELLED") {
-        retailMap[o.receiver.name] = (retailMap[o.receiver.name] || 0) + o.totalAmount;
+  retailerOrders.forEach(o => {
+    // শুধু কনফার্ম সেলস এবং সেন্ডার অবশ্যই রিটেইলার হতে হবে
+    if ((o.status === "SHIPPED" || o.status === "DELIVERED") && o.sender.role === "RETAILER") {
+        retailMap[o.sender.name] = (retailMap[o.sender.name] || 0) + o.totalAmount;
     }
   });
   const topRetailers = Object.entries(retailMap).sort(([, a], [, b]) => b - a).slice(0, 4).map(([name, amount]) => ({ name, amount }));
@@ -277,7 +292,7 @@ export default async function DistributorDashboard() {
               <button className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition shadow-sm"><Search size={20}/></button>
               <button className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition shadow-sm relative">
                  <Bell size={20}/>
-                 {pendingOrdersCount > 0 && <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-100"></span>}
+                 {pendingRetailerRequestsCount > 0 && <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-slate-100"></span>}
               </button>
               <Link href="/dashboard/distributor/place-order" className="flex items-center gap-2 bg-slate-900 text-white px-6 py-4 rounded-2xl font-bold hover:bg-slate-800 transition shadow-lg shadow-slate-900/20 active:scale-95">
                  <ShoppingCart size={18}/> Place Order
@@ -287,14 +302,14 @@ export default async function DistributorDashboard() {
 
         {/* --- KPI STATS --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-           <KPICard title="Confirmed Sales" value={formatCurrency(totalRevenue)} icon={<IndianRupee size={24}/>} color="green"/>
-           <KPICard title="Inventory Value" value={formatCurrency(stockValue)} icon={<Activity size={24}/>} color="blue"/>
-           <KPICard title="Stock Units" value={totalStock.toLocaleString()} sub="Available" icon={<Package size={24}/>} color="violet"/>
-           <KPICard title="Incoming" value={pendingArrivals.toString()} sub="Shipments" icon={<ArrowDownLeft size={24}/>} color="orange"/>
+           <KPICard title="Confirmed Sales" value={formatCurrency(totalRevenue)} sub="Shipped/Delivered Only" icon={<IndianRupee size={24}/>} color="green"/>
+           <KPICard title="Inventory Value" value={formatCurrency(stockValue)} sub="Potential Sales Value (MRP)" icon={<Activity size={24}/>} color="blue"/>
+           <KPICard title="Stock Units" value={totalStock.toLocaleString()} sub="Physical Items in Stocks" icon={<Package size={24}/>} color="violet"/>
+           <KPICard title="Incoming Value" value={formatCurrency(totalPendingInflowValue)} sub="Stock In-Transit" icon={<ArrowDownLeft size={24}/>} color="orange"/>
            <KPICard 
-              title="Pending Value" 
-              value={formatCurrency(totalPendingRevenue)} 
-              sub={`${pendingOrdersCount} Orders Waiting`}
+              title="Action Needed" 
+              value={pendingRetailerRequestsCount.toString()} 
+              sub={`Orders Pending Shipment`}
               icon={<ShoppingCart size={24}/>} 
               color="purple"
            />
@@ -306,7 +321,7 @@ export default async function DistributorDashboard() {
               <div className="flex justify-between items-center mb-6">
                  <div>
                     <h3 className="text-lg font-bold text-slate-800">Revenue Analysis</h3>
-                    <p className="text-sm text-slate-400">Monthly financial performance</p>
+                    <p className="text-sm text-slate-400">Monthly confirmed sales</p>
                  </div>
                  <div className="bg-green-50 text-green-600 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                     <TrendingUp size={12}/> +5.2%
@@ -337,7 +352,7 @@ export default async function DistributorDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
            <div className="lg:col-span-6 bg-white p-8 rounded-[32px] shadow-sm border border-slate-100">
               <h3 className="text-lg font-bold text-slate-800 mb-2">Weekly Performance</h3>
-              <p className="text-sm text-slate-400 mb-6">Sales volume (last 7 days)</p>
+              <p className="text-sm text-slate-400 mb-6">Confirmed sales volume</p>
               <div className="h-[300px] w-full"><WeeklySalesChart data={weeklyChartData} /></div>
            </div>
 
@@ -348,7 +363,7 @@ export default async function DistributorDashboard() {
               </div>
               <div className="space-y-4">
                  {topProducts.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 text-sm font-medium">No sales data yet</div>
+                    <div className="text-center py-8 text-slate-400 text-sm font-medium">No confirmed sales yet</div>
                  ) : (
                     topProducts.map((p, i) => (
                     <div key={i} className="flex items-center gap-4 p-3 rounded-2xl border border-slate-100 hover:border-slate-300 hover:shadow-md transition group bg-slate-50/30">
@@ -379,7 +394,7 @@ export default async function DistributorDashboard() {
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <Activity className="text-violet-500" size={20} /> Inventory Flow Analysis
                     </h3>
-                    <p className="text-sm text-slate-400 mt-1">Inflow (Purchase) vs Outflow (Sales) - Last 6 Months</p>
+                    <p className="text-sm text-slate-400 mt-1">Inflow (Purchase) vs Outflow (Shipped Sales)</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 md:gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">
                     <div className="text-center min-w-[80px]">
@@ -435,10 +450,9 @@ export default async function DistributorDashboard() {
               <div className="space-y-6 relative border-l-2 border-slate-100 ml-2">
                  {recentActivities.map((act, i) => (
                     <div key={i} className="pl-5 relative">
-                       {/* Dynamic Dot Color based on Type */}
                        <div className={`absolute -left-[7px] top-1 w-3 h-3 rounded-full border-2 border-white shadow-sm 
-                          ${act.type === 'STOCK_IN' ? 'bg-orange-500' : 
-                            act.type === 'REQUEST_IN' ? 'bg-purple-500' : 'bg-blue-500'}`}>
+                          ${act.type === 'STOCK_IN' || act.type === 'MY_PURCHASE' ? 'bg-orange-500' : 
+                             act.type === 'REQUEST_IN' ? 'bg-purple-500' : 'bg-blue-500'}`}>
                        </div>
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
                           {new Date(act.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
@@ -476,7 +490,7 @@ export default async function DistributorDashboard() {
               </h3>
               <div className="space-y-3 relative z-10">
                  {topRetailers.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-8"><p className="font-bold text-sm">No sales yet</p></div>
+                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-8"><p className="font-bold text-sm">No confirmed sales yet</p></div>
                  ) : (
                    topRetailers.map((p, i) => (
                     <div key={i} className="flex justify-between items-center p-2 rounded-xl bg-white/10 border border-white/5 backdrop-blur-sm">

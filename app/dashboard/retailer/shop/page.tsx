@@ -1,112 +1,185 @@
 import { prisma } from "@/lib/prisma";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { Search, ShoppingCart, Filter, Tag, Info } from "lucide-react";
+import { Search, ShoppingCart, Filter, Info, PackageCheck, Users, Store, ArrowRight, Tag } from "lucide-react";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 export default async function RetailerShopPage() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  const session = await auth();
+  const userId = session?.user?.id;
+
   if (!userId) redirect("/login");
 
-  // ১. সব প্রোডাক্ট ফেচ করা (Catalog)
-  // বাস্তবে এখানে স্টক চেক করা লাগতে পারে, কিন্তু আপাতত সব প্রোডাক্ট দেখাচ্ছি
-  const products = await prisma.product.findMany({
-    include: {
-      manufacturer: true, // কে বানিয়েছে তা দেখার জন্য
+  // ✅ LOGIC: Fetch Products AND their Stock Holders (Distributors)
+  const availableProducts = await prisma.product.findMany({
+    where: {
+      batches: {
+        some: {
+          inventory: {
+            some: {
+              currentStock: { gt: 0 },
+              user: { role: "DISTRIBUTOR" }
+            }
+          }
+        }
+      }
     },
-    orderBy: { name: 'asc' }
+    include: {
+      manufacturer: true, 
+      batches: {
+        where: {
+          inventory: {
+            some: {
+              currentStock: { gt: 0 },
+              user: { role: "DISTRIBUTOR" }
+            }
+          }
+        },
+        include: {
+          inventory: {
+            where: {
+              currentStock: { gt: 0 },
+              user: { role: "DISTRIBUTOR" }
+            },
+            include: {
+              user: true 
+            }
+          }
+        }
+      }
+    }
   });
 
   return (
-    <div className="max-w-7xl mx-auto p-6 pb-20 space-y-8">
+    <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans text-slate-800">
+      <div className="max-w-[1400px] mx-auto space-y-10">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-blue-600 rounded-3xl p-8 text-white shadow-xl shadow-blue-200">
-         <div>
-            <h1 className="text-3xl font-black mb-2 flex items-center gap-3">
-               <ShoppingCart size={32} className="text-blue-200"/> Marketplace
-            </h1>
-            <p className="text-blue-100 max-w-lg">
-               Browse the master catalog and place bulk orders to verified distributors.
-            </p>
-         </div>
-         <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20">
-            <p className="text-xs font-bold text-blue-200 uppercase tracking-wider">Available Medicines</p>
-            <p className="text-3xl font-black">{products.length}</p>
-         </div>
+        {/* 1. Modern Header Section */}
+        <div className="relative bg-gradient-to-r from-blue-600 to-indigo-700 rounded-[30px] p-10 md:p-14 overflow-hidden shadow-2xl shadow-blue-900/20 text-white flex flex-col md:flex-row items-center justify-between gap-8">
+           
+           {/* Abstract Shapes */}
+           <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/10 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none"></div>
+           <div className="absolute bottom-0 left-0 w-[250px] h-[250px] bg-blue-400/20 rounded-full blur-[60px] -ml-20 -mb-20 pointer-events-none"></div>
+
+           <div className="relative z-10 space-y-3 max-w-2xl">
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-xs font-bold uppercase tracking-wider text-blue-100 w-fit">
+                 <Store size={12} /> Retailer Procurement Portal
+              </div>
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
+                 Premium Medicine <br/> Marketplace
+              </h1>
+              <p className="text-blue-100 text-lg md:text-xl font-medium leading-relaxed opacity-90">
+                 Connect directly with verified distributors. access real-time stock, compare wholesale rates, and restock your pharmacy effortlessly.
+              </p>
+           </div>
+
+           {/* Live Stat Box */}
+           <div className="relative z-10 bg-white/10 backdrop-blur-lg border border-white/20 p-6 rounded-2xl min-w-[200px] text-center shadow-lg transform hover:scale-105 transition duration-300">
+              <div className="w-12 h-12 bg-white text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md">
+                 <Tag size={20} className="fill-current"/>
+              </div>
+              <p className="text-5xl font-black text-white">{availableProducts.length}</p>
+              <p className="text-xs font-bold text-blue-200 uppercase tracking-widest mt-1">Products Live</p>
+           </div>
+        </div>
+
+        {/* 2. Floating Action Bar (Search & Filter) */}
+        <div className="sticky top-6 z-40 bg-white/80 backdrop-blur-xl border border-slate-200/60 p-3 rounded-2xl shadow-lg shadow-slate-200/50 flex flex-col md:flex-row gap-3 items-center">
+           <div className="relative flex-1 w-full group">
+              <Search className="absolute left-5 top-4 text-slate-400 group-focus-within:text-blue-600 transition-colors duration-300" size={22}/>
+              <input 
+                 type="text" 
+                 placeholder="Search by brand name, generic name, or manufacturer..." 
+                 className="w-full pl-14 pr-6 py-3.5 bg-transparent rounded-xl text-lg text-slate-700 placeholder:text-slate-400 font-medium focus:outline-none focus:bg-slate-50 transition-all"
+              />
+           </div>
+           <div className="flex gap-3 w-full md:w-auto p-1">
+              <button className="flex items-center justify-center gap-2 px-6 py-3.5 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-sm shadow-sm flex-1 md:flex-none">
+                 <Filter size={18}/> Filters
+              </button>
+              <button className="flex items-center justify-center gap-2 px-8 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all text-sm shadow-lg shadow-slate-900/20 hover:shadow-xl transform active:scale-95 flex-1 md:flex-none">
+                 <ShoppingCart size={18}/> View Cart
+              </button>
+           </div>
+        </div>
+
+        {/* 3. Product Grid */}
+        {availableProducts.length === 0 ? (
+           <div className="flex flex-col items-center justify-center py-32 bg-white rounded-[32px] border border-dashed border-slate-200 shadow-sm">
+              <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                 <PackageCheck size={40} className="text-slate-300"/>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-700">No Inventory Found</h3>
+              <p className="text-slate-400 font-medium mt-2">Currently, no distributors have listed stock matching your criteria.</p>
+           </div>
+        ) : (
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {availableProducts.map((product) => {
+                 const firstBatch = product.batches[0];
+                 const mrp = firstBatch ? firstBatch.mrp : "N/A";
+                 const suppliers = new Set();
+                 product.batches.forEach(b => b.inventory.forEach(i => suppliers.add(i.user.name)));
+                 const supplierCount = suppliers.size;
+
+                 return (
+                    <div key={product.id} className="group relative bg-white rounded-[28px] border border-slate-100 p-6 flex flex-col justify-between hover:shadow-2xl hover:shadow-blue-900/10 transition-all duration-500 hover:-translate-y-1">
+                       
+                       {/* Floating Badge */}
+                       <div className="absolute top-6 right-6">
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full uppercase tracking-wide border border-slate-200 group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:border-blue-100 transition-colors">
+                             {product.type}
+                          </span>
+                       </div>
+
+                       <div>
+                          {/* Icon */}
+                          <div className="w-16 h-16 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 rounded-2xl flex items-center justify-center font-black text-3xl shadow-sm border border-blue-100/50 mb-6 group-hover:scale-110 transition-transform duration-500">
+                             {product.name.charAt(0)}
+                          </div>
+
+                          {/* Info */}
+                          <div className="space-y-1 mb-6">
+                             <h3 className="text-2xl font-bold text-slate-800 leading-tight group-hover:text-blue-600 transition-colors cursor-pointer">{product.name}</h3>
+                             <p className="text-sm text-slate-500 font-medium line-clamp-1">{product.genericName || "Generic Composition"}</p>
+                          </div>
+
+                          {/* Meta Pill */}
+                          <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-2 rounded-xl mb-8 w-full">
+                             <Info size={14} className="text-blue-400 shrink-0"/>
+                             <span className="text-xs font-semibold text-slate-600 truncate">Mfg: {product.manufacturer.name}</span>
+                          </div>
+                       </div>
+
+                       {/* Action Footer */}
+                       <div className="space-y-4">
+                          <div className="flex items-end justify-between border-t border-slate-50 pt-4">
+                             <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Retail Price</p>
+                                <div className="flex items-baseline gap-2">
+                                   <span className="text-2xl font-black text-slate-900">₹{mrp}</span>
+                                   <span className="text-xs font-medium text-slate-400 line-through decoration-slate-300">₹{Number(mrp) + (Number(mrp)*0.12)}</span>
+                                </div>
+                             </div>
+                          </div>
+
+                          <Link 
+                             href={`/dashboard/retailer/shop/${product.id}`} 
+                             className="w-full bg-slate-900 text-white h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-600 transition-colors duration-300 shadow-lg shadow-slate-900/10 group-hover:shadow-blue-600/20"
+                          >
+                             {supplierCount > 1 ? `Compare ${supplierCount} Sellers` : "Check Availability"}
+                             <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform"/>
+                          </Link>
+                       </div>
+
+                    </div>
+                 );
+              })}
+           </div>
+        )}
+
       </div>
-
-      {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex gap-4 sticky top-4 z-10">
-         <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-            <input 
-              type="text" 
-              placeholder="Search by medicine name, generic name or company..." 
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition"
-            />
-         </div>
-         <button className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-xl font-bold text-gray-700 hover:bg-gray-50">
-            <Filter size={20}/> Filters
-         </button>
-      </div>
-
-      {/* Product Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-         {products.map((product) => (
-            <div key={product.id} className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-lg transition group">
-               
-               {/* Product Header */}
-               <div className="flex justify-between items-start mb-4">
-                  <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-bold text-xl group-hover:scale-110 transition">
-                     {product.name.charAt(0)}
-                  </div>
-                  <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-1 rounded-md uppercase tracking-wide">
-                     {product.type}
-                  </span>
-               </div>
-
-               {/* Details */}
-               <h3 className="text-xl font-bold text-gray-800 mb-1">{product.name}</h3>
-               <p className="text-sm text-gray-500 mb-4">{product.genericName}</p>
-
-               <div className="space-y-2 mb-6">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                     <Tag size={14} className="text-gray-400"/>
-                     <span>Code: <span className="font-mono text-gray-700">{product.productCode}</span></span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                     <Info size={14} className="text-gray-400"/>
-                     <span>Mfg by: <span className="font-bold text-gray-700">{product.manufacturer.name}</span></span>
-                  </div>
-               </div>
-
-               {/* Price & Action */}
-               <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                  <div>
-                     <p className="text-[10px] text-gray-400 font-bold uppercase">Est. Price</p>
-                     <p className="text-lg font-black text-gray-800">₹{product.basePrice || "N/A"}</p>
-                  </div>
-                  
-                  {/* অর্ডার বাটন: এটি পরে Order Create Page এ নিয়ে যাবে */}
-                  <Link 
-                     href={`/dashboard/retailer/shop/${product.id}`} 
-                     className="bg-gray-900 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 transition flex items-center gap-2"
-                  >
-                     <ShoppingCart size={16}/> Order
-                  </Link>
-               </div>
-            </div>
-         ))}
-      </div>
-      
-      {products.length === 0 && (
-         <div className="text-center py-20 text-gray-400">
-            <p>No medicines found in the catalog.</p>
-         </div>
-      )}
-
     </div>
   );
 }

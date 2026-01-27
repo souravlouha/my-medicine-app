@@ -89,9 +89,7 @@ export async function getTrackingData(scannedId: string) {
           include: {
             product: true,
             manufacturer: true,
-            recalls: { // ✅ Recall স্ট্যাটাস চেক করা হচ্ছে
-               where: { status: "ACTIVE" } 
-            }
+            recalls: { where: { status: "ACTIVE" } }
           },
         },
       },
@@ -101,15 +99,26 @@ export async function getTrackingData(scannedId: string) {
       return {
         success: true,
         data: {
-          type: unit.type, // STRIP, BOX, or CARTON
+          type: unit.type, 
           batchNumber: unit.batch.batchNumber,
           expDate: unit.batch.expDate,
-          mfgDate: unit.batch.mfgDate, // ✅ Mfg Date যোগ করা হলো
+          mfgDate: unit.batch.mfgDate,
           mrp: unit.batch.mrp,
-          product: unit.batch.product,
-          manufacturer: unit.batch.manufacturer,
-          isRecalled: unit.batch.recalls.length > 0, // ✅ Recall হলে true হবে
-          unitId: unit.uid // ✅ Strip ID পাঠানোর জন্য
+          isRecalled: unit.batch.recalls.length > 0,
+          unitId: unit.uid,
+          // ✅ PRIVACY FILTER: Only public fields
+          product: {
+            name: unit.batch.product.name,
+            genericName: unit.batch.product.genericName,
+            type: unit.batch.product.type,
+            strength: unit.batch.product.strength,
+            // ❌ No basePrice
+          },
+          manufacturer: {
+            name: unit.batch.manufacturer.name,
+            address: unit.batch.manufacturer.address,
+            licenseNo: unit.batch.manufacturer.licenseNo
+          }
         },
       };
     }
@@ -133,10 +142,21 @@ export async function getTrackingData(scannedId: string) {
           expDate: batch.expDate,
           mfgDate: batch.mfgDate,
           mrp: batch.mrp,
-          product: batch.product,
-          manufacturer: batch.manufacturer,
           isRecalled: batch.recalls.length > 0,
-          unitId: null
+          unitId: null,
+          // ✅ PRIVACY FILTER: Only public fields
+          product: {
+            name: batch.product.name,
+            genericName: batch.product.genericName,
+            type: batch.product.type,
+            strength: batch.product.strength,
+            // ❌ No basePrice
+          },
+          manufacturer: {
+            name: batch.manufacturer.name,
+            address: batch.manufacturer.address,
+            licenseNo: batch.manufacturer.licenseNo
+          }
         },
       };
     }

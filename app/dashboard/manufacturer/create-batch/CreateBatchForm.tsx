@@ -10,11 +10,12 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ✅ FIX: Environment Variable থেকে Base URL নেওয়া হচ্ছে (Localhost বা Vercel)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
   // 1. Form States
   const [selectedProductId, setSelectedProductId] = useState("");
+  
+  // আমরা ডিফল্ট হিসেবে Base Price দেখাচ্ছি, কিন্তু ম্যানুফ্যাকচারার এটা বাড়িয়ে MRP সেট করবে
   const [mrp, setMrp] = useState<number | string>(""); 
   
   // 2. Hierarchy States
@@ -35,6 +36,10 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     const pId = e.target.value;
     setSelectedProductId(pId);
     const product = products.find(p => p.id === pId);
+    
+    // এখানে আমরা Base Price অটো-ফিল করতে পারি, কিন্তু সাধারণত MRP আলাদা হয়।
+    // তাই ফিল্ডটি ফাঁকা রাখা বা ম্যানুয়ালি এডিট করার অপশন রাখা ভালো।
+    // আপাতত আমরা Base Price টাই দেখাচ্ছি, ইউজার চাইলে বাড়াতে পারবে।
     if (product) setMrp(product.basePrice || "");
     else setMrp("");
   };
@@ -44,14 +49,16 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     setLoading(true);
     const formData = new FormData(event.currentTarget);
     
+    // Explicitly append hierarchy data
     formData.append("totalCartons", totalCartons.toString());
     formData.append("boxesPerCarton", boxesPerCarton.toString());
     formData.append("stripsPerBox", stripsPerBox.toString());
 
+    // 'mrp' ফিল্ড ইনপুট থেকে অটোমেটিক formData তে চলে যাবে কারণ ইনপুটের name="mrp" আছে
+
     const res = await createAdvancedBatchAction(formData);
 
     if (res.success) {
-      // ✅ FIX: এখানে (res.batchId || "") এবং (res.batchNo || "") দেওয়া হলো টাইপ এরর ফিক্স করতে
       setCreatedBatch({ 
           id: res.batchId || "", 
           no: res.batchNo || "" 
@@ -63,7 +70,7 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     setLoading(false);
   }
 
-  // ✅ FULL HIERARCHY PREVIEW (Updated Logic with baseUrl)
+  // ✅ FULL HIERARCHY PREVIEW
   if (createdBatch) {
     return (
       <div className="space-y-8 animate-fade-in">
@@ -90,18 +97,14 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
         
         {/* 🔥 THE FULL HIERARCHY TREE VIEW 🔥 */}
         <div className="space-y-8 print-area">
-           {/* Loop 1: Cartons */}
            {Array.from({ length: totalCartons }).map((_, cIndex) => {
-             // 👇 লজিক আপডেট: Backend ID Format (CARTON-Batch-Index)
              const cartonId = `CARTON-${createdBatch.no}-${cIndex+1}`;
              
              return (
              <div key={cIndex} className="border-4 border-gray-800 rounded-3xl p-8 bg-white relative break-inside-avoid">
                
-               {/* Carton Header */}
                <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6">
                   <div className="bg-white p-2 border border-gray-200 rounded-lg">
-                     {/* 👇 QR Link আপডেট করা হয়েছে: baseUrl + ID Match */}
                      <QRCode value={`${baseUrl}/verify/${cartonId}`} size={100} />
                   </div>
                   <div>
@@ -111,19 +114,15 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
                   </div>
                </div>
 
-               {/* Loop 2: Boxes Grid */}
                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {Array.from({ length: boxesPerCarton }).map((_, bIndex) => {
-                    // 👇 লজিক আপডেট: Backend ID Format (BOX-Batch-C-B)
                     const boxId = `BOX-${createdBatch.no}-${cIndex+1}-${bIndex+1}`;
 
                     return (
                     <div key={bIndex} className="border-2 border-gray-300 rounded-2xl p-5 bg-gray-50 break-inside-avoid">
                        
-                       {/* Box Header */}
                        <div className="flex items-center gap-4 mb-4">
                           <div className="bg-white p-1.5 border border-gray-200 rounded">
-                             {/* 👇 QR Link আপডেট করা হয়েছে */}
                              <QRCode value={`${baseUrl}/verify/${boxId}`} size={60} />
                           </div>
                           <div>
@@ -133,15 +132,12 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
                           </div>
                        </div>
 
-                       {/* Loop 3: Strips Grid (Small Items) */}
                        <div className="grid grid-cols-5 gap-3">
                           {Array.from({ length: stripsPerBox }).map((_, sIndex) => {
-                            // 👇 লজিক আপডেট: Backend ID Format (STRIP-Batch-C-B-S)
                             const stripId = `STRIP-${createdBatch.no}-${cIndex+1}-${bIndex+1}-${sIndex+1}`;
 
                             return (
                             <div key={sIndex} className="flex flex-col items-center bg-white p-2 rounded border border-gray-200 shadow-sm hover:border-blue-400 transition">
-                               {/* 👇 QR Link আপডেট করা হয়েছে */}
                                <QRCode value={`${baseUrl}/verify/${stripId}`} size={40} />
                                <span className="text-[8px] font-mono font-bold mt-1 text-gray-400">{sIndex+1}</span>
                             </div>
@@ -163,14 +159,14 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     );
   }
 
-  // ✅ PRODUCTION FORM (Input Area)
+  // ✅ PRODUCTION FORM
   return (
     <form onSubmit={handleSubmit} className="space-y-8 animate-fade-in">
       
-      {/* 1. Product & Auto-Price */}
+      {/* 1. Product & Price */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
          <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-gray-700 mb-2">Select Product from Catalog</label>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Select Product</label>
             <div className="flex gap-2">
                 <select 
                   name="productId" 
@@ -193,7 +189,8 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
          </div>
          
          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">MRP (Auto-Filled)</label>
+            {/* ✅ Label Updated for clarity */}
+            <label className="block text-sm font-bold text-gray-700 mb-2">Set MRP (Consumer Price)</label>
             <div className="relative">
               <span className="absolute left-4 top-4 text-gray-500 font-bold">₹</span>
               <input 
@@ -203,10 +200,11 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
                 required 
                 value={mrp} 
                 onChange={(e) => setMrp(e.target.value)}
-                placeholder="0.00" 
+                placeholder="100.00" 
                 className="w-full pl-8 p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-gray-50 font-bold text-gray-800" 
               />
             </div>
+            <p className="text-[10px] text-gray-400 mt-1">This price will be printed on QR.</p>
          </div>
       </div>
 
