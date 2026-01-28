@@ -12,7 +12,7 @@ export default async function CreateBatchPage() {
   if (!userId) redirect("/login");
 
   // 1. EXISTING DATA FETCHING
-  // প্রোডাক্ট লিস্ট আনা হচ্ছে যাতে ফর্মের ড্রপডাউনে দেখানো যায়
+  // প্রোডাক্ট লিস্ট আনা হচ্ছে যাতে ফর্মের ড্রপডাউনে দেখানো যায়
   const products = await prisma.product.findMany({
     where: { manufacturerId: userId }
   });
@@ -28,7 +28,7 @@ export default async function CreateBatchPage() {
 
   const productionChartData = last7DaysBatches.reduce((acc: any[], curr) => {
     const date = new Date(curr.createdAt).toLocaleDateString('en-US', { weekday: 'short' });
-    const existing = acc.find(item => item.date === date);
+    const existing = acc.find((item: any) => item.date === date);
     if (existing) existing.quantity += curr.totalQuantity;
     else acc.push({ date: date, quantity: curr.totalQuantity });
     return acc;
@@ -115,7 +115,7 @@ export default async function CreateBatchPage() {
                   </div>
               </div>
            </div>
-        </div>
+         </div>
       </div>
     </div>
   );

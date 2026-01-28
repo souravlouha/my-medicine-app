@@ -1,7 +1,7 @@
 "use client";
 
 import { createAdvancedBatchAction } from "@/lib/actions/manufacturer-actions";
-import { useState, useMemo } from "react"; 
+import { useState, useMemo, useEffect } from "react"; 
 import { useRouter } from "next/navigation";
 import QRCode from "react-qr-code";
 import Link from "next/link";
@@ -10,12 +10,18 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  // ✅ FIX: অটোমেটিক লাইভ URL ডিটেক্ট করার লজিক
+  const [baseUrl, setBaseUrl] = useState("");
+
+  useEffect(() => {
+    // ব্রাউজারে রান হওয়ার সময় এটি বর্তমান ডোমেইন (localhost বা vercel link) নিয়ে নেবে
+    if (typeof window !== "undefined") {
+      setBaseUrl(window.location.origin);
+    }
+  }, []);
 
   // 1. Form States
   const [selectedProductId, setSelectedProductId] = useState("");
-  
-  // আমরা ডিফল্ট হিসেবে Base Price দেখাচ্ছি, কিন্তু ম্যানুফ্যাকচারার এটা বাড়িয়ে MRP সেট করবে
   const [mrp, setMrp] = useState<number | string>(""); 
   
   // 2. Hierarchy States
@@ -36,10 +42,6 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     const pId = e.target.value;
     setSelectedProductId(pId);
     const product = products.find(p => p.id === pId);
-    
-    // এখানে আমরা Base Price অটো-ফিল করতে পারি, কিন্তু সাধারণত MRP আলাদা হয়।
-    // তাই ফিল্ডটি ফাঁকা রাখা বা ম্যানুয়ালি এডিট করার অপশন রাখা ভালো।
-    // আপাতত আমরা Base Price টাই দেখাচ্ছি, ইউজার চাইলে বাড়াতে পারবে।
     if (product) setMrp(product.basePrice || "");
     else setMrp("");
   };
@@ -53,8 +55,6 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     formData.append("totalCartons", totalCartons.toString());
     formData.append("boxesPerCarton", boxesPerCarton.toString());
     formData.append("stripsPerBox", stripsPerBox.toString());
-
-    // 'mrp' ফিল্ড ইনপুট থেকে অটোমেটিক formData তে চলে যাবে কারণ ইনপুটের name="mrp" আছে
 
     const res = await createAdvancedBatchAction(formData);
 
@@ -105,6 +105,7 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
                
                <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6">
                   <div className="bg-white p-2 border border-gray-200 rounded-lg">
+                     {/* ✅ QR Code now uses dynamic baseUrl */}
                      <QRCode value={`${baseUrl}/verify/${cartonId}`} size={100} />
                   </div>
                   <div>
@@ -189,7 +190,6 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
          </div>
          
          <div>
-            {/* ✅ Label Updated for clarity */}
             <label className="block text-sm font-bold text-gray-700 mb-2">Set MRP (Consumer Price)</label>
             <div className="relative">
               <span className="absolute left-4 top-4 text-gray-500 font-bold">₹</span>
