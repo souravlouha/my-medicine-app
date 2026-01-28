@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Package, Search, Filter, AlertCircle, TrendingUp } from "lucide-react";
 import InventoryAnalytics from "./InventoryAnalytics";
-import { updateSellingPriceAction } from "@/lib/actions/distributor-actions"; // Ensure this action exists
+import { updateSellingPriceAction } from "@/lib/actions/distributor-actions"; 
 
 export default async function DistributorInventoryPage() {
   const session = await auth();
@@ -13,7 +13,8 @@ export default async function DistributorInventoryPage() {
     redirect("/login");
   }
 
-  const inventoryItems = await prisma.inventory.findMany({
+  // 1. Fetch Data
+  const rawInventoryItems = await prisma.inventory.findMany({
     where: { 
       userId: userId,
       currentStock: { gt: 0 } 
@@ -25,6 +26,10 @@ export default async function DistributorInventoryPage() {
     },
     orderBy: { updatedAt: 'desc' }
   });
+
+  // ✅ FIX 2: Date Serialization (Prevent "Server-side exception")
+  // ডাটাবেসের Date অবজেক্টগুলোকে String-এ কনভার্ট করা হচ্ছে যাতে Client Component ক্র্যাশ না করে।
+  const inventoryItems = JSON.parse(JSON.stringify(rawInventoryItems));
 
   return (
     <div className="max-w-7xl mx-auto p-6 pb-20 space-y-8">
@@ -39,6 +44,7 @@ export default async function DistributorInventoryPage() {
           </div>
       </div>
 
+      {/* Analytics Section */}
       {inventoryItems.length > 0 ? (
           <InventoryAnalytics inventory={inventoryItems} />
       ) : (
@@ -78,7 +84,7 @@ export default async function DistributorInventoryPage() {
                   {inventoryItems.length === 0 && (
                       <tr><td colSpan={6} className="py-10 text-center text-gray-400">Inventory is empty. Receive shipments to add stock.</td></tr>
                   )}
-                  {inventoryItems.map((item) => {
+                  {inventoryItems.map((item: any) => {
                       const isLowStock = item.currentStock < 50;
                       
                       return (
@@ -106,10 +112,11 @@ export default async function DistributorInventoryPage() {
                               ₹{item.batch.mrp}
                             </td>
 
-                            {/* ✅ FIXED SELLING PRICE INPUT */}
+                            {/* ✅ FIX 1: Form Action Type Error Fixed */}
                             <td className="py-4 px-6 text-right bg-blue-50/30 border-l border-blue-50">
                               <form 
                                 action={async (formData) => {
+                                  "use server";
                                   await updateSellingPriceAction(formData);
                                 }} 
                                 className="flex items-center justify-end gap-2"
@@ -121,18 +128,19 @@ export default async function DistributorInventoryPage() {
                                         type="number" 
                                         name="price"
                                         defaultValue={item.sellingPrice || ""} 
-                                        placeholder="Set Price"
-                                        className="w-24 pl-5 pr-2 py-1.5 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-700 text-right"
+                                        placeholder="Set"
+                                        className="w-20 pl-5 pr-2 py-1.5 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-700 text-right"
                                         step="0.01"
                                         required
                                     />
                                   </div>
-                                  <button type="submit" className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm" title="Update Price">
+                                  <button type="submit" className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm" title="Update">
                                     <TrendingUp size={14}/>
                                   </button>
                               </form>
-                              {item.sellingPrice === 0 && (
-                                  <p className="text-[10px] text-red-500 mt-1 flex items-center justify-end gap-1"><AlertCircle size={10}/> Not set yet</p>
+                              
+                              {(!item.sellingPrice || item.sellingPrice === 0) && (
+                                  <p className="text-[10px] text-red-500 mt-1 flex items-center justify-end gap-1"><AlertCircle size={10}/> Not set</p>
                               )}
                             </td>
                         </tr>
