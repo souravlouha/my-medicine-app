@@ -1,21 +1,28 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { ArrowLeft, User, MapPin, CheckCircle, ShoppingCart, Package, Tag, Percent } from "lucide-react";
+import { ArrowLeft, User, MapPin, CheckCircle, ShoppingCart, Package, Percent, Filter } from "lucide-react";
 import Link from "next/link";
 
-// Helper
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency', currency: 'INR', maximumFractionDigits: 2
   }).format(amount);
 };
 
-export default async function ProductOrderPage({ params }: { params: Promise<{ productId: string }> }) {
+interface ProductPageProps {
+  params: Promise<{ productId: string }>;
+  searchParams: Promise<{ sort?: string }>; // ✅ Added searchParams support
+}
+
+export default async function ProductOrderPage(props: ProductPageProps) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const { productId } = await params;
+  const params = await props.params;
+  const searchParams = await props.searchParams; // ✅ Await search params
+  const { productId } = params;
+  const sortBy = searchParams?.sort || "price_asc"; // Default sort
 
   if (!productId) {
     return <div className="p-10 text-center text-red-500 font-bold">Error: Invalid Product ID</div>;
@@ -29,7 +36,7 @@ export default async function ProductOrderPage({ params }: { params: Promise<{ p
 
   if (!product) return <div className="p-10 text-center text-slate-500">Product Not Found</div>;
 
-  // 2. Find Distributors with Stock
+  // 2. Find Distributors and Sort using Prisma
   const distributorInventory = await prisma.inventory.findMany({
     where: {
       batch: { productId: productId },
@@ -40,11 +47,10 @@ export default async function ProductOrderPage({ params }: { params: Promise<{ p
       user: true,  
       batch: true  
     },
-    // অর্ডার: যাদের দাম কম, তাদের আগে দেখাবে
-    orderBy: [
-      { sellingPrice: 'asc' }, 
-      { currentStock: 'desc' }
-    ]
+    // ✅ Dynamic Sorting based on URL param
+    orderBy: sortBy === 'price_desc' 
+      ? [{ sellingPrice: 'desc' }, { currentStock: 'desc' }]
+      : [{ sellingPrice: 'asc' }, { currentStock: 'desc' }]
   });
 
   return (
@@ -83,9 +89,17 @@ export default async function ProductOrderPage({ params }: { params: Promise<{ p
 
       {/* Distributors List */}
       <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2 mb-6">
-             <User size={24} className="text-blue-500"/> Select a Distributor
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+             <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <User size={24} className="text-blue-500"/> Select a Distributor
+             </h2>
+             
+             {/* Local Filter for Details Page */}
+             <div className="flex gap-2">
+                <Link href={`?sort=price_asc`} className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${sortBy === 'price_asc' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`}>Lowest Price</Link>
+                <Link href={`?sort=price_desc`} className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${sortBy === 'price_desc' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`}>Highest Price</Link>
+             </div>
+          </div>
 
           <div className="grid grid-cols-1 gap-4">
              {distributorInventory.length === 0 ? (
@@ -97,7 +111,6 @@ export default async function ProductOrderPage({ params }: { params: Promise<{ p
              ) : (
                 distributorInventory.map((inventory) => {
                     const mrp = inventory.batch.mrp;
-                    // ✅ ডাটাবেস থেকে দাম নেওয়া হচ্ছে (যদি null থাকে তবে MRP)
                     const sellingPrice = inventory.sellingPrice && inventory.sellingPrice > 0 
                                          ? inventory.sellingPrice 
                                          : mrp;
@@ -157,12 +170,16 @@ export default async function ProductOrderPage({ params }: { params: Promise<{ p
                                  )}
                                  
                                  <p className="text-2xl font-black text-blue-600">{formatCurrency(sellingPrice)}</p>
-                                 <p className="text-[10px] text-slate-400 font-medium line-through">MRP: {formatCurrency(mrp)}</p>
+                                 
+                                 <div className="flex items-center gap-2 justify-end">
+                                     <p className="text-[10px] text-slate-400 font-medium">MRP: <span className={discount > 0 ? "line-through decoration-red-400" : ""}>{formatCurrency(mrp)}</span></p>
+                                 </div>
                               </div>
 
                               <form action="/dashboard/retailer/cart/add"> 
                                   <input type="hidden" name="inventoryId" value={inventory.id} />
                                   <input type="hidden" name="price" value={sellingPrice} />
+                                  
                                   <button className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold text-sm hover:bg-blue-600 transition shadow-lg shadow-slate-900/20 flex items-center gap-2 active:scale-95 whitespace-nowrap">
                                      <ShoppingCart size={18}/> Buy Now
                                   </button>
