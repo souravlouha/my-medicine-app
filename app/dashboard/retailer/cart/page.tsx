@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { Trash2, ShoppingCart, CreditCard, Package, Store, Minus, Plus } from "lucide-react"; 
+import { Trash2, ShoppingCart, CreditCard, Package, Store, Minus, Plus, ArrowRight, ShieldCheck, Info } from "lucide-react"; 
 import { placeOrderAction, removeFromCartAction, updateCartItemQuantityAction } from "@/lib/actions/retailer-actions";
 import Link from "next/link";
 
@@ -36,126 +36,149 @@ export default async function CartPage() {
   const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans text-slate-800">
-      <div className="max-w-5xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-50/50 p-6 md:p-10 font-sans text-slate-800">
+      <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Header */}
-        <div className="flex items-center justify-between">
-           <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
-              <ShoppingCart size={32} className="text-blue-600"/> My Cart
-           </h1>
-           <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-xl font-bold text-sm">
+        <div className="flex items-center justify-between bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+           <div>
+              <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
+                <ShoppingCart size={32} className="text-blue-600"/> My Cart
+              </h1>
+              <p className="text-slate-500 font-medium mt-1">Review and place orders for your pharmacy.</p>
+           </div>
+           <div className="bg-blue-50 text-blue-700 px-5 py-2.5 rounded-xl font-bold text-sm border border-blue-100">
               {cartItems.length} Items
-           </span>
+           </div>
         </div>
 
         {cartItems.length === 0 ? (
-           <div className="text-center py-20 bg-white rounded-[32px] border border-dashed border-slate-200">
-              <Package size={64} className="mx-auto text-slate-200 mb-4"/>
-              <h3 className="text-xl font-bold text-slate-400">Your cart is empty</h3>
-              <Link href="/dashboard/retailer/shop" className="text-blue-600 font-bold hover:underline mt-2 inline-block">
+           <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[32px] border border-dashed border-slate-300">
+              <div className="bg-slate-50 p-6 rounded-full mb-4">
+                 <Package size={64} className="text-slate-300"/>
+              </div>
+              <h3 className="text-2xl font-bold text-slate-700">Your cart is empty</h3>
+              <p className="text-slate-400 mt-1 max-w-xs text-center">Looks like you haven't added any medicine stock yet.</p>
+              <Link href="/dashboard/retailer/shop" className="mt-6 bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95">
                  Browse Marketplace
               </Link>
            </div>
         ) : (
-           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               
-              {/* Cart Items List */}
-              <div className="lg:col-span-2 space-y-4">
+              {/* Left: Cart Items List (Span 8) */}
+              <div className="lg:col-span-8 space-y-4">
                  {cartItems.map((item) => (
-                    <div key={item.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center gap-6">
-                       
-                       {/* Product Icon */}
-                       <div className="h-20 w-20 bg-slate-50 rounded-xl flex items-center justify-center text-3xl font-bold text-slate-600 shrink-0">
-                          {item.inventory.batch.product.name.charAt(0)}
-                       </div>
-
-                       {/* Details */}
-                       <div className="flex-1 text-center sm:text-left space-y-1">
-                          <h3 className="font-bold text-slate-900 text-lg">{item.inventory.batch.product.name}</h3>
-                          <div className="flex flex-wrap justify-center sm:justify-start gap-3 text-xs text-slate-500">
-                             <span className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                                <Store size={12}/> {item.inventory.user.name}
-                             </span>
-                             <span className="bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                                MRP: ₹{item.inventory.batch.mrp}
-                             </span>
+                    <div key={item.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition duration-200 group">
+                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                          
+                          {/* Product Icon */}
+                          <div className="h-24 w-24 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500 shrink-0 border border-blue-100">
+                             <Package size={32} />
                           </div>
-                          <p className="text-xs font-bold text-blue-600">
-                             Deal Price: ₹{item.price} / unit
-                          </p>
+
+                          {/* Details */}
+                          <div className="flex-1 space-y-2">
+                             <div className="flex justify-between items-start">
+                                <div>
+                                   <h3 className="font-bold text-slate-900 text-xl">{item.inventory.batch.product.name}</h3>
+                                   <p className="text-sm text-slate-500">{item.inventory.batch.product.genericName}</p>
+                                </div>
+                                <div className="text-right">
+                                   <p className="text-lg font-black text-slate-800">₹{(item.price * item.quantity).toFixed(2)}</p>
+                                   <p className="text-xs text-slate-400">₹{item.price} / unit</p>
+                                </div>
+                             </div>
+
+                             <div className="flex flex-wrap gap-2 text-xs font-bold pt-1">
+                                <span className="flex items-center gap-1.5 bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg">
+                                   <Store size={12}/> {item.inventory.user.name}
+                                </span>
+                                <span className="bg-amber-50 text-amber-700 border border-amber-100 px-3 py-1.5 rounded-lg">
+                                   Batch: {item.inventory.batch.batchNumber}
+                                </span>
+                             </div>
+                          </div>
                        </div>
 
-                       {/* Quantity Controller */}
-                       <div className="flex flex-col items-center gap-2">
-                          <div className="flex items-center gap-3 bg-slate-50 rounded-xl p-1 border border-slate-200">
+                       {/* Action Row (Quantity & Delete) */}
+                       <div className="mt-5 pt-4 border-t border-slate-100 flex justify-between items-center">
+                          <div className="flex items-center gap-4 bg-slate-50 rounded-xl p-1 border border-slate-200">
                              <form action={updateCartItemQuantityAction}>
                                 <input type="hidden" name="itemId" value={item.id} />
                                 <input type="hidden" name="type" value="minus" />
-                                <button className="p-2 bg-white rounded-lg text-slate-600 shadow-sm hover:bg-slate-100 active:scale-95 disabled:opacity-50" disabled={item.quantity <= 1}>
-                                   <Minus size={14} />
+                                <button className="w-9 h-9 flex items-center justify-center bg-white rounded-lg text-slate-600 shadow-sm hover:bg-slate-100 active:scale-90 disabled:opacity-50 transition" disabled={item.quantity <= 1}>
+                                   <Minus size={16} />
                                 </button>
                              </form>
 
-                             <span className="font-bold text-slate-900 w-6 text-center">{item.quantity}</span>
+                             <span className="font-bold text-slate-900 w-8 text-center text-lg">{item.quantity}</span>
 
                              <form action={updateCartItemQuantityAction}>
                                 <input type="hidden" name="itemId" value={item.id} />
                                 <input type="hidden" name="type" value="plus" />
-                                <button className="p-2 bg-slate-900 rounded-lg text-white shadow-sm hover:bg-slate-700 active:scale-95">
-                                   <Plus size={14} />
+                                <button className="w-9 h-9 flex items-center justify-center bg-slate-900 rounded-lg text-white shadow-sm hover:bg-black active:scale-90 transition">
+                                   <Plus size={16} />
                                 </button>
                              </form>
                           </div>
-                       </div>
 
-                       {/* Total & Remove */}
-                       <div className="text-right flex flex-col items-end gap-2">
-                          <p className="text-xl font-black text-slate-900">₹{(item.price * item.quantity).toFixed(2)}</p>
-                          
                           <form action={removeFromCartAction}>
                              <input type="hidden" name="itemId" value={item.id} />
-                             <button className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
-                                <Trash2 size={18}/>
+                             <button className="flex items-center gap-2 px-4 py-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition text-sm font-bold">
+                                <Trash2 size={18}/> Remove
                              </button>
                           </form>
                        </div>
-
                     </div>
                  ))}
               </div>
 
-              {/* Checkout Panel */}
-              <div className="bg-white p-8 rounded-[32px] border border-slate-200 h-fit shadow-xl sticky top-6">
-                 <h2 className="text-xl font-bold text-slate-800 mb-6">Order Summary</h2>
-                 
-                 <div className="space-y-3 mb-6 border-b border-slate-100 pb-6">
-                    <div className="flex justify-between text-slate-500 text-sm">
-                       <span>Subtotal</span>
-                       <span>₹{totalAmount.toFixed(2)}</span>
+              {/* Right: Checkout Panel (Span 4) */}
+              <div className="lg:col-span-4 space-y-6">
+                 <div className="bg-white p-6 rounded-[24px] border border-slate-200 shadow-xl sticky top-6">
+                    <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        Checkout Summary
+                    </h2>
+                    
+                    <div className="space-y-4 mb-6 border-b border-dashed border-slate-200 pb-6">
+                       <div className="flex justify-between text-slate-500 text-sm font-medium">
+                          <span>Subtotal</span>
+                          <span className="text-slate-800">₹{totalAmount.toFixed(2)}</span>
+                       </div>
+                       <div className="flex justify-between text-slate-500 text-sm font-medium">
+                          <span>Tax (GST 0%)</span>
+                          <span className="text-slate-800">₹0.00</span>
+                       </div>
+                       <div className="flex justify-between text-slate-500 text-sm font-medium">
+                          <span>Delivery</span>
+                          <span className="text-green-600 font-bold">Free</span>
+                       </div>
                     </div>
-                    {/* ✅ GST Shown as 0% for now */}
-                    <div className="flex justify-between text-slate-500 text-sm">
-                       <span>Tax (GST 0%)</span>
-                       <span>₹0.00</span>
+
+                    <div className="flex justify-between items-center mb-8">
+                       <span className="font-bold text-slate-800 text-lg">Total Payable</span>
+                       <span className="text-3xl font-black text-blue-600">
+                          ₹{totalAmount.toFixed(2)}
+                       </span>
+                    </div>
+
+                    <form action={placeOrderAction} className="space-y-4">
+                       <button className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-slate-300 hover:bg-black transition flex items-center justify-center gap-2 active:scale-95 group">
+                          <CreditCard size={20}/> Place Order <ArrowRight size={20} className="group-hover:translate-x-1 transition"/>
+                       </button>
+                       <div className="bg-blue-50 p-3 rounded-xl flex items-start gap-3 border border-blue-100">
+                          <Info size={16} className="text-blue-500 shrink-0 mt-0.5"/>
+                          <p className="text-[11px] text-blue-700 leading-tight">
+                             Separate orders will be automatically created for each distributor based on their items.
+                          </p>
+                       </div>
+                    </form>
+
+                    <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-bold mt-4">
+                        <ShieldCheck size={14}/> Secure B2B Checkout
                     </div>
                  </div>
-
-                 <div className="flex justify-between items-center mb-8">
-                    <span className="font-bold text-slate-800">Total Payable</span>
-                    <span className="text-3xl font-black text-blue-600">
-                       ₹{totalAmount.toFixed(2)}
-                    </span>
-                 </div>
-
-                 <form action={placeOrderAction} className="space-y-4">
-                    <button className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-slate-800 transition flex items-center justify-center gap-2 active:scale-95">
-                       <CreditCard size={20}/> Place Order
-                    </button>
-                    <p className="text-[10px] text-center text-slate-400">
-                       Separate orders will be created for each distributor.
-                    </p>
-                 </form>
               </div>
 
            </div>

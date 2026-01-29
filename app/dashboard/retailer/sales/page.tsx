@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { Calendar, Search, Filter, TrendingUp } from "lucide-react";
+import { 
+  Calendar, Search, Filter, TrendingUp, 
+  Package, Tablets, CheckCircle2, IndianRupee 
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -24,36 +27,43 @@ export default async function SalesHistoryPage() {
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.totalPrice, 0);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-10">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-50/50 p-6 md:p-10 font-sans text-slate-800">
+      <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-end gap-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <div>
-            <h1 className="text-3xl font-black text-slate-900">Sales History</h1>
-            <p className="text-slate-500 font-medium">Track every transaction and revenue details.</p>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Sales History</h1>
+            <p className="text-slate-500 font-medium mt-1">Track every transaction and monitor your revenue.</p>
           </div>
-          <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
+          
+          <div className="flex items-center gap-4 bg-emerald-50 px-6 py-3 rounded-2xl border border-emerald-100">
             <div className="text-right">
-              <p className="text-xs font-bold text-slate-400 uppercase">Total Revenue</p>
-              <h2 className="text-2xl font-black text-emerald-600">₹{totalRevenue.toLocaleString()}</h2>
+              <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Total Revenue</p>
+              <h2 className="text-2xl font-black text-emerald-700 flex items-center justify-end gap-1">
+                <IndianRupee size={20}/> {totalRevenue.toLocaleString()}
+              </h2>
             </div>
-            <div className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
+            <div className="h-10 w-10 bg-white text-emerald-600 rounded-full flex items-center justify-center shadow-sm">
               <TrendingUp size={20}/>
             </div>
           </div>
         </div>
 
         {/* Table Container */}
-        <div className="bg-white rounded-[24px] shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-[24px] shadow-lg shadow-slate-200/50 border border-slate-200 overflow-hidden">
           
-          {/* Filters */}
-          <div className="p-5 border-b border-slate-100 flex gap-3">
-             <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-3 text-slate-400" size={18}/>
-                <input type="text" placeholder="Search sales..." className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-slate-900/10"/>
+          {/* Filters & Search */}
+          <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row gap-4 bg-white/50 backdrop-blur-sm">
+             <div className="relative flex-1 max-w-md group">
+                <Search className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-blue-500 transition" size={18}/>
+                <input 
+                  type="text" 
+                  placeholder="Search by medicine name, batch no..." 
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 outline-none transition font-medium"
+                />
              </div>
-             <button className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">
+             <button className="flex items-center gap-2 px-6 py-3 border border-slate-200 bg-white rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition shadow-sm hover:shadow">
                 <Filter size={18}/> Filter
              </button>
           </div>
@@ -61,27 +71,35 @@ export default async function SalesHistoryPage() {
           {/* Sales Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-50/50 text-xs font-bold text-slate-400 uppercase tracking-wider">
+              <thead className="bg-slate-50/80 text-xs font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="p-5">Date & Time</th>
-                  <th className="p-5">Medicine Info</th>
-                  <th className="p-5">Batch No</th>
-                  <th className="p-5 text-center">Quantity</th>
-                  <th className="p-5 text-right">Total Amount</th>
+                  <th className="p-6">Date & Time</th>
+                  <th className="p-6">Medicine Info</th>
+                  <th className="p-6">Batch No</th>
+                  <th className="p-6 text-center">Quantity</th>
+                  <th className="p-6 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
                 {sales.length === 0 ? (
                    <tr>
-                      <td colSpan={5} className="p-10 text-center text-slate-400 font-medium">No sales records found.</td>
+                      <td colSpan={5} className="p-16 text-center text-slate-400 font-medium bg-slate-50/30">
+                        <div className="flex flex-col items-center gap-2">
+                          <Package size={32} className="opacity-20"/>
+                          <p>No sales records found yet.</p>
+                        </div>
+                      </td>
                    </tr>
                 ) : (
-                  // 🔴 Force Fix: (sale: any) ব্যবহার করা হয়েছে যাতে লাল দাগ না আসে
                   sales.map((sale: any) => (
-                    <tr key={sale.id} className="hover:bg-slate-50/80 transition group">
-                      <td className="p-5">
+                    <tr key={sale.id} className="hover:bg-blue-50/30 transition group duration-200">
+                      
+                      {/* Date */}
+                      <td className="p-6">
                         <div className="flex items-center gap-3 font-bold text-slate-700">
-                          <Calendar size={16} className="text-slate-400"/>
+                          <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition">
+                            <Calendar size={18}/>
+                          </div>
                           <div>
                             <p>{new Date(sale.date).toLocaleDateString()}</p>
                             <p className="text-xs text-slate-400 font-medium mt-0.5">
@@ -90,32 +108,44 @@ export default async function SalesHistoryPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="p-5">
-                        <p className="font-bold text-slate-900">{sale.batch.product.name}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{sale.batch.product.genericName}</p>
-                        <span className="inline-block mt-2 text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded uppercase">
+
+                      {/* Medicine Info */}
+                      <td className="p-6">
+                        <p className="font-bold text-slate-900 text-base">{sale.batch.product.name}</p>
+                        <p className="text-xs text-slate-500 mt-0.5 font-medium">{sale.batch.product.genericName}</p>
+                        <span className="inline-block mt-2 text-[10px] font-bold bg-slate-100 px-2.5 py-1 rounded-md text-slate-500 border border-slate-200">
                           {sale.batch.product.type}
                         </span>
                       </td>
-                      <td className="p-5">
-                        <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded">
+
+                      {/* Batch */}
+                      <td className="p-6">
+                        <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
                           {sale.batch.batchNumber}
                         </span>
                       </td>
                       
                       {/* Quantity & Unit Type */}
-                      <td className="p-5 text-center">
-                        <span className="text-lg font-black text-slate-800">{sale.quantity}</span>
-                        {/* এখন আর এখানে লাল দাগ আসবে না কারণ আমরা sale কে any বানিয়ে দিয়েছি */}
-                        <span className={`ml-1 text-xs font-bold uppercase ${sale.unitType === 'TABLET' ? 'text-orange-500' : 'text-slate-400'}`}>
-                           {sale.unitType === "TABLET" ? "Tabs" : "Strips"}
-                        </span>
+                      <td className="p-6 text-center">
+                        <div className="inline-flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-sm">
+                          <span className="text-lg font-black text-slate-800">{sale.quantity}</span>
+                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md flex items-center gap-1 ${sale.unitType === 'TABLET' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                             {sale.unitType === "TABLET" ? <Tablets size={12}/> : <Package size={12}/>}
+                             {sale.unitType === "TABLET" ? "Tabs" : "Strips"}
+                          </span>
+                        </div>
                       </td>
 
-                      <td className="p-5 text-right">
-                        <p className="text-lg font-black text-emerald-600">₹{sale.totalPrice}</p>
-                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">Received via Cash/UPI</p>
+                      {/* Amount */}
+                      <td className="p-6 text-right">
+                        <p className="text-lg font-black text-emerald-600 flex items-center justify-end gap-0.5">
+                          <IndianRupee size={16} strokeWidth={3}/>{sale.totalPrice.toFixed(2)}
+                        </p>
+                        <div className="flex items-center justify-end gap-1 mt-1 text-[10px] font-bold text-slate-400">
+                          <CheckCircle2 size={12} className="text-emerald-500"/> Paid via Cash/UPI
+                        </div>
                       </td>
+
                     </tr>
                   ))
                 )}
