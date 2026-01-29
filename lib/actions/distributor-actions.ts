@@ -5,107 +5,167 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth"; 
 
 // ==========================================
-// 1. SHIPMENT RECEIVE ACTION (Distributor receives stock)
+// 1. UPDATE ORDER STATUS (The MAIN FIX)
+// ==========================================
+// এই ফাংশনটি আপনার OrdersView.tsx পেজে কল হচ্ছে।
+export async function updateOrderStatusAction(formData: FormData) {
+  const session = await auth();
+  const userId = session?.user?.id; // Distributor ID
+
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  const orderId = formData.get("orderId") as string;
+  const newStatus = formData.get("newStatus") as string;
+
+  if (!orderId || !newStatus) return { success: false, error: "Missing data" };
+
+  try {
+    // ---------------------------------------------------------
+    // CASE 1: যদি স্ট্যাটাস "SHIPPED" করা হয়, তবে শিপমেন্ট তৈরি করতে হবে
+    // ---------------------------------------------------------
+    if (newStatus === "SHIPPED") {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true }
+      });
+
+      if (!order) throw new Error("Order not found");
+      
+      // চেক: অর্ডারটি কি ইতিমধ্যে শিপ করা হয়েছে?
+      if (order.status === "SHIPPED") {
+         return { success: false, error: "Order is already shipped" };
+      }
+
+      await prisma.$transaction(async (tx) => {
+        const shipmentId = `SHP-${Date.now().toString().slice(-6)}`;
+        let shipmentTotal = 0;
+        const shipmentItemsData = [];
+
+        // ১. ইনভেন্টরি চেক এবং আপডেট
+        for (const item of order.items) {
+          const inventoryRecord = await tx.inventory.findFirst({
+            where: { 
+              userId: userId, // Distributor
+              batch: { productId: item.productId },
+              currentStock: { gte: item.quantity }
+            },
+            include: { batch: true },
+            orderBy: { batch: { expDate: 'asc' } }
+          });
+
+          if (!inventoryRecord) throw new Error(`Insufficient stock for Product ID: ${item.productId}`);
+
+          // স্টক কমানো
+          await tx.inventory.update({
+            where: { id: inventoryRecord.id },
+            data: { currentStock: { decrement: item.quantity } }
+          });
+
+          shipmentItemsData.push({
+            batchId: inventoryRecord.batchId,
+            quantity: item.quantity,
+            price: item.price
+          });
+          shipmentTotal += (item.quantity * item.price);
+        }
+
+        // ২. শিপমেন্ট তৈরি (Retailer-এর জন্য)
+        await tx.shipment.create({
+          data: {
+            shipmentId: shipmentId,
+            manufacturerId: userId,         // Sender = Distributor
+            distributorId: order.senderId,  // Receiver = Retailer (IMPORTANT)
+            totalAmount: shipmentTotal,
+            status: "IN_TRANSIT",
+            items: { create: shipmentItemsData }
+          }
+        });
+
+        // ৩. অর্ডার স্ট্যাটাস আপডেট
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: "SHIPPED" }
+        });
+      });
+
+      revalidatePath("/dashboard/distributor/orders");
+      return { success: true, message: "✅ Shipment Created & Order Shipped!" };
+    } 
+    
+    // ---------------------------------------------------------
+    // CASE 2: অন্যান্য স্ট্যাটাস (APPROVED, CANCELLED, etc.)
+    // ---------------------------------------------------------
+    else {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: newStatus as any } 
+      });
+
+      revalidatePath("/dashboard/distributor/orders");
+      return { success: true, message: `Status updated to ${newStatus}` };
+    }
+
+  } catch (error: any) {
+    console.error("Update Status Error:", error);
+    return { success: false, error: error.message || "Failed to update status" };
+  }
+}
+
+// ==========================================
+// 2. RECEIVE SHIPMENT (Distributor receives stock)
 // ==========================================
 export async function receiveShipmentAction(shipmentId: string) {
   const session = await auth();
   const userId = session?.user?.id;
   
-  if (!userId) {
-    console.error("Receive Action: No User ID found in session");
-    return { success: false, error: "Unauthorized: Please login first." };
-  }
+  if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    console.log(`Receiving Shipment ID: ${shipmentId} for User: ${userId}`);
-
-    // ১. শিপমেন্ট চেক করা
     const shipment = await prisma.shipment.findUnique({
       where: { id: shipmentId },
       include: { items: true } 
     });
 
     if (!shipment) return { success: false, error: "Shipment not found" };
-    
-    // Authorization Check
-    if (shipment.distributorId !== userId) {
-        console.error(`Auth Error: Shipment Receiver ${shipment.distributorId} !== Current User ${userId}`);
-        return { success: false, error: "Not authorized to receive this shipment" };
-    }
+    if (shipment.distributorId !== userId) return { success: false, error: "Not authorized" };
+    if (shipment.status === "DELIVERED") return { success: false, error: "Already received" };
 
-    if (shipment.status === "DELIVERED") return { success: false, error: "Already received!" };
-
-    // ২. ট্রানজ্যাকশন (স্টক আপডেট + স্ট্যাটাস চেঞ্জ)
     await prisma.$transaction(async (tx) => {
-      
-      // A. ইনভেন্টরি আপডেট (Loop through items)
-      const itemsToProcess = shipment.items || []; 
-
-      for (const item of itemsToProcess) {
-        // ডিস্ট্রিবিউটরের ইনভেন্টরিতে এই ব্যাচ আছে কিনা দেখা
+      for (const item of shipment.items) {
         const existingStock = await tx.inventory.findUnique({
-          where: {
-            userId_batchId: {
-              userId: userId,
-              batchId: item.batchId
-            }
-          }
+          where: { userId_batchId: { userId: userId, batchId: item.batchId } }
         });
 
         if (existingStock) {
-          // থাকলে স্টক বাড়ানো
           await tx.inventory.update({
             where: { id: existingStock.id },
-            data: { 
-                currentStock: { increment: item.quantity },
-            }
+            data: { currentStock: { increment: item.quantity } }
           });
         } else {
-          // না থাকলে নতুন এন্ট্রি তৈরি করা
           await tx.inventory.create({
-            data: {
-              userId: userId,
-              batchId: item.batchId,
-              currentStock: item.quantity,
-              sellingPrice: 0 // ✅ Default value, distributor will set later
-            }
+            data: { userId: userId, batchId: item.batchId, currentStock: item.quantity, sellingPrice: 0 }
           });
         }
       }
-
-      // B. শিপমেন্ট স্ট্যাটাস আপডেট
       await tx.shipment.update({
         where: { id: shipmentId },
-        data: { 
-          // @ts-ignore: Enum conflict fix
-          status: "DELIVERED" as any, 
-          receivedAt: new Date()
-        }
+        data: { status: "DELIVERED", receivedAt: new Date() }
       });
-
     });
 
-    console.log("Transaction Successful!");
-
     revalidatePath("/dashboard/distributor");
-    revalidatePath("/dashboard/distributor/incoming");
-    revalidatePath("/dashboard/distributor/inventory");
-    
     return { success: true, message: "Stock Received Successfully!" };
-
   } catch (error) {
-    console.error("Receive Action Error:", error);
-    return { success: false, error: "Failed to update inventory. Check server logs." };
+    return { success: false, error: "Failed to receive stock." };
   }
 }
 
 // ==========================================
-// 2. PLACE ORDER ACTION (Distributor buys from Manufacturer)
+// 3. PLACE ORDER (Distributor -> Manufacturer)
 // ==========================================
 export async function placeOrderAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
-
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const productId = formData.get("productId") as string;
@@ -113,57 +173,37 @@ export async function placeOrderAction(formData: FormData) {
   const quantity = parseInt(formData.get("quantity") as string);
   const price = parseFloat(formData.get("price") as string);
 
-  if (!productId || !quantity || !manufacturerId) {
-    return { success: false, error: "Invalid data" };
-  }
-
   try {
     const orderId = `ORD-${Date.now().toString().slice(-6)}`;
-
     await prisma.order.create({
       data: {
         orderId: orderId,
-        senderId: userId,         // Distributor (Buyer)
-        receiverId: manufacturerId, // Manufacturer (Seller)
+        senderId: userId,
+        receiverId: manufacturerId,
         totalAmount: price * quantity,
-        // @ts-ignore
-        status: "PENDING" as any,
-        items: {
-          create: {
-            productId: productId,
-            quantity: quantity,
-            price: price
-          }
-        }
+        status: "PENDING",
+        items: { create: { productId, quantity, price } }
       }
     });
-
     revalidatePath("/dashboard/distributor/orders");
-    return { success: true, message: "Order Placed Successfully!" };
-
+    return { success: true, message: "Order Placed!" };
   } catch (error) {
-    console.error("Order Error:", error);
     return { success: false, error: "Failed to place order." };
   }
 }
 
 // ==========================================
-// 3. CREATE MANUAL SHIPMENT (Distributor sends to Retailer manually)
+// 4. MANUAL SHIPMENT (Extra feature)
 // ==========================================
 export async function createDistributorShipmentAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
-
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const retailerId = formData.get("retailerId") as string;
   const inventoryId = formData.get("inventoryId") as string;
   const quantity = parseInt(formData.get("quantity") as string);
   const pricePerUnit = parseFloat(formData.get("price") as string);
-
-  if (!retailerId || !inventoryId || !quantity) {
-    return { success: false, error: "Invalid data" };
-  }
 
   try {
     const inventoryItem = await prisma.inventory.findUnique({
@@ -172,73 +212,49 @@ export async function createDistributorShipmentAction(formData: FormData) {
     });
 
     if (!inventoryItem || inventoryItem.currentStock < quantity) {
-      return { success: false, error: "Insufficient stock in inventory!" };
+      return { success: false, error: "Insufficient stock!" };
     }
 
     await prisma.$transaction(async (tx) => {
-      // A. স্টক কমানো
       await tx.inventory.update({
         where: { id: inventoryId },
         data: { currentStock: { decrement: quantity } }
       });
 
-      // B. শিপমেন্ট তৈরি
-      const shipmentId = `SHP-${Date.now().toString().slice(-6)}`;
-      
       await tx.shipment.create({
         data: {
-          shipmentId: shipmentId,
-          manufacturerId: userId, // Distributor acting as Sender
-          distributorId: retailerId, // Retailer receiving
+          shipmentId: `SHP-${Date.now().toString().slice(-6)}`,
+          manufacturerId: userId, 
+          distributorId: retailerId,
           totalAmount: quantity * pricePerUnit,
-          // @ts-ignore
-          status: "IN_TRANSIT" as any,
-          items: { 
-            create: {
-              batchId: inventoryItem.batchId,
-              quantity: quantity,
-              price: pricePerUnit
-            }
-          }
+          status: "IN_TRANSIT",
+          items: { create: { batchId: inventoryItem.batchId, quantity, price: pricePerUnit } }
         }
       });
     });
 
     revalidatePath("/dashboard/distributor/inventory");
-    revalidatePath("/dashboard/distributor/shipment");
-    return { success: true, message: "Shipment Dispatched to Retailer!" };
-
+    return { success: true, message: "Shipment Dispatched!" };
   } catch (error) {
-    console.error("Dispatch Error:", error);
     return { success: false, error: "Failed to create shipment." };
   }
 }
 
 // ==========================================
-// 4. UPDATE ORDER STATUS ACTION (Manage Incoming Orders)
+// 5. HELPER ACTIONS
 // ==========================================
-export async function updateOrderStatusAction(formData: FormData) {
-  const orderId = formData.get("orderId") as string;
-  const newStatus = formData.get("newStatus") as string;
-
-  if (!orderId || !newStatus) return;
-
-  try {
-    // অর্ডার স্ট্যাটাস আপডেট করা
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { status: newStatus as any } 
-    });
-
-    revalidatePath("/dashboard/distributor/orders");
-    
-  } catch (error) {
-    console.error("Failed to update order status:", error);
-    throw new Error("Failed to update order status");
-  }
+export async function approveRetailerOrderAction(formData: FormData) {
+  // This just wraps the update status action for specific button usage if needed
+  formData.append("newStatus", "APPROVED");
+  return updateOrderStatusAction(formData);
 }
 
-// ✅ [NEW] UPDATE SELLING PRICE ACTION (For Distributor Inventory)
+export async function shipOrderToRetailerAction(formData: FormData) {
+  // This just wraps the update status action for specific button usage if needed
+  formData.append("newStatus", "SHIPPED");
+  return updateOrderStatusAction(formData);
+}
+
 export async function updateSellingPriceAction(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) return { success: false, error: "Unauthorized" };
@@ -246,21 +262,14 @@ export async function updateSellingPriceAction(formData: FormData) {
   const inventoryId = formData.get("inventoryId") as string;
   const price = parseFloat(formData.get("price") as string);
 
-  if (!inventoryId || isNaN(price)) return { success: false, error: "Invalid data" };
-
   try {
     await prisma.inventory.update({
-      where: { 
-        id: inventoryId,
-        userId: session.user.id // Security check: Must belong to user
-      },
+      where: { id: inventoryId, userId: session.user.id },
       data: { sellingPrice: price }
     });
-
     revalidatePath("/dashboard/distributor/inventory");
     return { success: true, message: "Price updated" };
   } catch (error) {
-    console.error("Update Price Error:", error);
     return { success: false, error: "Failed to update price" };
   }
 }

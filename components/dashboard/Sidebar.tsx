@@ -17,7 +17,8 @@ import {
   ShoppingBag,
   Boxes,
   ScanBarcode, 
-  Printer 
+  Printer,
+  TrendingUp // ✅ NEW: Icon for Sales History
 } from "lucide-react";
 
 export default function Sidebar({ userRole }: { userRole: string }) {
@@ -245,7 +246,27 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                <ShoppingBag size={20} /> Buy Medicine
              </Link>
 
-             {/* 3. Shelf Inventory */}
+             {/* 3. My Orders */}
+             <Link 
+               href="/dashboard/retailer/orders"
+               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
+                 isActive("/dashboard/retailer/orders") ? "bg-indigo-50 text-indigo-700 shadow-sm" : "text-gray-600 hover:bg-indigo-50 hover:text-indigo-700"
+               }`}
+             >
+               <ClipboardList size={20} /> My Orders
+             </Link>
+
+             {/* ✅ 4. Sales History (NEW) */}
+             <Link 
+               href="/dashboard/retailer/sales"
+               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
+                 isActive("/dashboard/retailer/sales") ? "bg-emerald-50 text-emerald-700 shadow-sm" : "text-gray-600 hover:bg-emerald-50 hover:text-emerald-700"
+               }`}
+             >
+               <TrendingUp size={20} /> Sales History
+             </Link>
+
+             {/* 5. Shelf Inventory */}
              <Link 
                href="/dashboard/retailer/inventory"
                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
@@ -255,7 +276,7 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                <Package size={20} /> Shelf Inventory
              </Link>
 
-             {/* 4. Incoming Shipments */}
+             {/* 6. Incoming Shipments */}
              <Link 
                href="/dashboard/retailer/incoming"
                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
@@ -265,9 +286,9 @@ export default function Sidebar({ userRole }: { userRole: string }) {
                <Truck size={20} /> Incoming Stock
              </Link>
 
-             {/* ✅ 5. NEW: Quality & Recall Link */}
+             {/* 7. Quality & Recall */}
              <Link 
-               href="/dashboard/retailer/recalls" // Ensure this matches your page path
+               href="/dashboard/retailer/recalls"
                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium ${
                  isActive("/dashboard/retailer/recalls") ? "bg-red-50 text-red-700 shadow-sm" : "text-gray-600 hover:bg-red-50 hover:text-red-700"
                }`}

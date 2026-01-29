@@ -12,6 +12,7 @@ export default async function CatalogPage() {
   }
 
   // ডাটাবেস থেকে সব প্রোডাক্ট নিয়ে আসা
+  // Prisma স্বয়ংক্রিয়ভাবে নতুন ফিল্ড (tabletsPerStrip) নিয়ে আসবে
   const products = await prisma.product.findMany({
     where: { manufacturerId: userId },
     orderBy: { createdAt: 'desc' }

@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { ArrowLeft, User, MapPin, CheckCircle, ShoppingCart, Package, Percent, Filter } from "lucide-react";
+import { ArrowLeft, User, MapPin, CheckCircle, ShoppingCart, Package, Percent, Calendar } from "lucide-react";
 import Link from "next/link";
+import { addToCartAction } from "@/lib/actions/retailer-actions"; 
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -12,7 +13,7 @@ const formatCurrency = (amount: number) => {
 
 interface ProductPageProps {
   params: Promise<{ productId: string }>;
-  searchParams: Promise<{ sort?: string }>; // ✅ Added searchParams support
+  searchParams: Promise<{ sort?: string }>;
 }
 
 export default async function ProductOrderPage(props: ProductPageProps) {
@@ -20,13 +21,9 @@ export default async function ProductOrderPage(props: ProductPageProps) {
   if (!session?.user?.id) redirect("/login");
 
   const params = await props.params;
-  const searchParams = await props.searchParams; // ✅ Await search params
+  const searchParams = await props.searchParams;
   const { productId } = params;
-  const sortBy = searchParams?.sort || "price_asc"; // Default sort
-
-  if (!productId) {
-    return <div className="p-10 text-center text-red-500 font-bold">Error: Invalid Product ID</div>;
-  }
+  const sortBy = searchParams?.sort || "price_asc";
 
   // 1. Get Product Details
   const product = await prisma.product.findUnique({
@@ -36,7 +33,7 @@ export default async function ProductOrderPage(props: ProductPageProps) {
 
   if (!product) return <div className="p-10 text-center text-slate-500">Product Not Found</div>;
 
-  // 2. Find Distributors and Sort using Prisma
+  // 2. Find Distributors
   const distributorInventory = await prisma.inventory.findMany({
     where: {
       batch: { productId: productId },
@@ -47,7 +44,6 @@ export default async function ProductOrderPage(props: ProductPageProps) {
       user: true,  
       batch: true  
     },
-    // ✅ Dynamic Sorting based on URL param
     orderBy: sortBy === 'price_desc' 
       ? [{ sellingPrice: 'desc' }, { currentStock: 'desc' }]
       : [{ sellingPrice: 'asc' }, { currentStock: 'desc' }]
@@ -93,8 +89,6 @@ export default async function ProductOrderPage(props: ProductPageProps) {
              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <User size={24} className="text-blue-500"/> Select a Distributor
              </h2>
-             
-             {/* Local Filter for Details Page */}
              <div className="flex gap-2">
                 <Link href={`?sort=price_asc`} className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${sortBy === 'price_asc' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`}>Lowest Price</Link>
                 <Link href={`?sort=price_desc`} className={`px-4 py-2 rounded-xl text-xs font-bold border transition ${sortBy === 'price_desc' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'}`}>Highest Price</Link>
@@ -122,8 +116,8 @@ export default async function ProductOrderPage(props: ProductPageProps) {
                     return (
                         <div key={inventory.id} className="bg-white p-6 rounded-[24px] border border-slate-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300 flex flex-col md:flex-row justify-between items-center gap-6 group">
                            
-                           {/* Distributor Info */}
-                           <div className="flex items-center gap-5 flex-1 w-full">
+                           {/* 1. Distributor Info */}
+                           <div className="flex items-center gap-5 flex-1 w-full md:w-auto">
                               <div className="h-14 w-14 bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 rounded-2xl flex items-center justify-center font-bold text-xl shadow-inner">
                                  {inventory.user.name.charAt(0)}
                               </div>
@@ -141,24 +135,24 @@ export default async function ProductOrderPage(props: ProductPageProps) {
                               </div>
                            </div>
 
-                           {/* Stock Info */}
-                           <div className="flex items-center gap-8 w-full md:w-auto bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 justify-between md:justify-start">
+                           {/* 2. ✅ STOCK INFO (Current Stock Display) */}
+                           <div className="flex items-center gap-8 w-full md:w-auto bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 justify-between md:justify-center flex-1 mx-4">
                               <div className="text-left">
-                                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Available</p>
+                                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Available Stock</p>
                                  <p className="font-black text-slate-800 text-lg flex items-center gap-1">
                                     {inventory.currentStock.toLocaleString()} <span className="text-xs font-bold text-slate-400">Units</span>
                                  </p>
                               </div>
                               <div className="w-px h-8 bg-slate-200 hidden md:block"></div>
                               <div className="text-right md:text-left">
-                                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Expiry</p>
-                                 <p className="font-bold text-slate-700 text-sm font-mono">
+                                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Expiry Date</p>
+                                 <p className="font-bold text-slate-700 text-sm font-mono flex items-center gap-1">
                                     {new Date(inventory.batch.expDate).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
                                  </p>
                               </div>
                            </div>
 
-                           {/* Price & Action */}
+                           {/* 3. Price & Action */}
                            <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-slate-100 pt-4 md:pt-0">
                               <div className="text-left md:text-right">
                                  {discount > 0 && (
@@ -176,7 +170,8 @@ export default async function ProductOrderPage(props: ProductPageProps) {
                                  </div>
                               </div>
 
-                              <form action="/dashboard/retailer/cart/add"> 
+                              {/* Form with Correct Action */}
+                              <form action={addToCartAction}> 
                                   <input type="hidden" name="inventoryId" value={inventory.id} />
                                   <input type="hidden" name="price" value={sellingPrice} />
                                   

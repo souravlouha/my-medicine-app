@@ -1,127 +1,214 @@
-import { currentUser } from "@/lib/auth"; // ✅ currentUser ইমপোর্ট করুন
-import { prisma as db } from "@/lib/prisma"; 
-import { formatCurrency } from "@/lib/formatters";
-import { ActivityLog } from "@/components/dashboard/activity-log";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, CreditCard, TrendingUp, Store, ShoppingCart, DollarSign } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { redirect } from "next/navigation"; // ✅ রিডাইরেক্টের জন্য প্রয়োজন
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth"; 
+import { redirect } from "next/navigation";
+import { 
+  Package, TrendingUp, Activity, ShoppingBag, 
+  IndianRupee, Calendar, AlertTriangle, Wallet 
+} from "lucide-react";
+import { WeeklySalesChart } from "@/components/dashboard/DashboardCharts"; 
+
+export const dynamic = "force-dynamic";
+
+// Helper Functions
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-IN', { 
+    style: 'currency', currency: 'INR', maximumFractionDigits: 0 
+  }).format(amount);
+};
 
 export default async function RetailerDashboard() {
-  const user = await currentUser() as any;
+  const session = await auth();
+  const userId = session?.user?.id;
 
-  // ✅ ইউজার না থাকলে লগইন পেজে পাঠিয়ে দিন
-  if (!user) {
-    redirect("/auth/login");
+  if (!userId) redirect("/login");
+
+  // ✅ DATA FETCHING: SalesRecord যোগ করা হলো
+  const [user, inventory, salesRecords, recentOrders] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
+    
+    // Inventory
+    prisma.inventory.findMany({ 
+        where: { userId }, 
+        include: { batch: { include: { product: true } } } 
+    }),
+
+    // ✅ SALES RECORDS (Real Sales Data from POS)
+    prisma.salesRecord.findMany({
+        where: { sellerId: userId },
+        orderBy: { date: 'desc' },
+        include: { batch: { include: { product: true } } }
+    }),
+
+    // Recent Purchases (Orders I placed)
+    prisma.order.findMany({
+        where: { senderId: userId },
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: { items: true }
+    })
+  ]);
+
+  if (!user) return <div>User not found</div>;
+
+  // --- 🧮 CALCULATIONS ---
+
+  // 1. Revenue & Profit (From SalesRecord)
+  const totalRevenue = salesRecords.reduce((sum, sale) => sum + sale.totalPrice, 0);
+  
+  // Profit Calculation (Approximate logic: Sales Price - Cost Price)
+  // যেহেতু আমাদের কাছে প্রতিটি সেলের সঠিক কস্ট প্রাইস এই মুহূর্তে নেই, 
+  // আমরা আনুমানিক ২০% মার্জিন ধরছি অথবা শুধু রেভেনিউ দেখাচ্ছি।
+  // ভবিষ্যতে Inventory মডেলে 'buyingPrice' থাকলে সঠিক প্রফিট বের করা যাবে।
+  const estimatedProfit = totalRevenue * 0.20; // 20% Profit Margin Assumption
+
+  // 2. Inventory Value
+  const totalItems = inventory.reduce((acc, item) => acc + item.currentStock, 0);
+  const inventoryValue = inventory.reduce((acc, item) => acc + (item.currentStock * item.batch.mrp), 0);
+
+  // 3. Weekly Sales Chart Data
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const last7DaysMap = new Map();
+  
+  // Initialize last 7 days with 0
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dayName = days[d.getDay()];
+    last7DaysMap.set(dayName, { name: dayName, sales: 0 });
   }
 
-  // ডাটাবেস থেকে ডাটা আনা (Prisma ব্যবহার করে)
-  const salesCount = await db.order.count({ 
-    where: { senderId: user.id } 
-  }).catch(() => 0);
-  
-  const inventoryCount = await db.inventory.count({
-    where: { userId: user.id }
-  }).catch(() => 0);
+  // Fill actual sales data
+  salesRecords.forEach(sale => {
+    const saleDate = new Date(sale.date);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - saleDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
-  // ডামি ডাটা (এগুলো পরে ডাইনামিক করতে পারবেন)
-  const totalRevenue = 0; 
-  const totalProfit = 0;
-  const assetValue = 0;
+    if (diffDays <= 7) {
+        const dayName = days[saleDate.getDay()];
+        if (last7DaysMap.has(dayName)) {
+            const entry = last7DaysMap.get(dayName);
+            entry.sales += sale.totalPrice;
+            last7DaysMap.set(dayName, entry);
+        }
+    }
+  });
+  const weeklyChartData = Array.from(last7DaysMap.values());
+
+  // 4. Activity Log (Combine Sales & Orders)
+  const activities = [
+    ...salesRecords.slice(0, 5).map(s => ({
+        type: "SALE",
+        title: `Sold ${s.quantity}x ${s.batch.product.name}`,
+        date: s.date,
+        amount: s.totalPrice
+    })),
+    ...recentOrders.map(o => ({
+        type: "ORDER",
+        title: `Ordered Stock`,
+        date: o.createdAt,
+        amount: o.totalAmount
+    }))
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+
 
   return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
-      
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b pb-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Retail Dashboard</h2>
-          <p className="text-muted-foreground">
-            Welcome back, <span className="font-semibold text-blue-600">{user?.name}</span>
-          </p>
-        </div>
+    <div className="min-h-screen bg-slate-50/80 p-6 md:p-8 font-sans text-slate-800">
+      <div className="max-w-[1600px] mx-auto space-y-8">
         
-        <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center justify-end gap-1">
-               <Store className="w-3 h-3" /> {user?.shopName || "My Pharmacy"}
-            </p>
-            <p className="text-xs text-gray-500">
-              License: {user?.licenseNumber || "Pending"}
-            </p>
-          </div>
-          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border border-blue-200 uppercase">
-             {user?.name?.[0] || "R"}
-          </div>
-          <Link href="/dashboard/retailer/pos">
-            <Button size="sm" className="ml-2 bg-blue-600 hover:bg-blue-700 text-white">
-              <ShoppingCart className="mr-2 h-4 w-4" /> New Sale (POS)
-            </Button>
-          </Link>
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Retail Dashboard</h1>
+                <p className="text-slate-500 font-medium">Welcome back, <span className="text-blue-600">{user.name}</span></p>
+            </div>
+            <div className="px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-200 text-xs font-bold text-slate-500">
+                {new Date().toDateString()}
+            </div>
         </div>
-      </div>
 
-      {/* STATS CARDS */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-blue-600 to-blue-700 text-white border-none shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-100">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-blue-100" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
-            <p className="text-xs text-blue-200 mt-1">+20.1% from last month</p>
-          </CardContent>
-        </Card>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            {/* Total Revenue */}
+            <div className="bg-blue-600 text-white p-6 rounded-[24px] shadow-lg shadow-blue-200 relative overflow-hidden">
+                <div className="relative z-10">
+                    <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Total Revenue</p>
+                    <h3 className="text-3xl font-black">{formatCurrency(totalRevenue)}</h3>
+                    <div className="mt-4 flex items-center gap-2 text-xs font-bold bg-white/10 w-fit px-2 py-1 rounded-lg backdrop-blur-sm">
+                        <TrendingUp size={14}/> +From Sales
+                    </div>
+                </div>
+                <IndianRupee className="absolute right-4 bottom-4 text-blue-500/50" size={64}/>
+            </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalProfit)}</div>
-            <p className="text-xs text-green-600 font-medium mt-1">~25% Margin</p>
-          </CardContent>
-        </Card>
+            {/* Net Profit (Est) */}
+            <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm group hover:-translate-y-1 transition">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Wallet size={24}/></div>
+                    <span className="text-emerald-600 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-lg">~20% Margin</span>
+                </div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Est. Net Profit</p>
+                <h3 className="text-2xl font-black text-slate-800">{formatCurrency(estimatedProfit)}</h3>
+            </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(assetValue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Locked Assets</p>
-          </CardContent>
-        </Card>
+            {/* Inventory Value */}
+            <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm group hover:-translate-y-1 transition">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-violet-50 text-violet-600 rounded-2xl"><Activity size={24}/></div>
+                </div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Inventory Value (MRP)</p>
+                <h3 className="text-2xl font-black text-slate-800">{formatCurrency(inventoryValue)}</h3>
+            </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{inventoryCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">Batches in stock</p>
-          </CardContent>
-        </Card>
-      </div>
+            {/* Total Items */}
+            <div className="bg-white p-6 rounded-[24px] border border-slate-100 shadow-sm group hover:-translate-y-1 transition">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-orange-50 text-orange-600 rounded-2xl"><Package size={24}/></div>
+                </div>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Stock In Hand</p>
+                <h3 className="text-2xl font-black text-slate-800">{totalItems} <span className="text-sm text-slate-400 font-bold">Units</span></h3>
+            </div>
+        </div>
 
-      {/* CHART & ACTIVITY LOG */}
-      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
-        <Card className="col-span-1 lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Weekly Sales Trend</CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-             <div className="h-[350px] w-full flex items-center justify-center text-muted-foreground bg-slate-50 dark:bg-slate-900 rounded-md border border-dashed">
-                <p>Chart Data Loading...</p>
-             </div>
-          </CardContent>
-        </Card>
-        <ActivityLog />
+        {/* Charts & Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Sales Chart */}
+            <div className="lg:col-span-2 bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-800 mb-6">Weekly Sales Trend</h3>
+                <div className="h-[300px] w-full">
+                    <WeeklySalesChart data={weeklyChartData} />
+                </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm flex flex-col">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <Activity size={20} className="text-blue-500"/> Recent Activity
+                </h3>
+                <div className="flex-1 space-y-6">
+                    {activities.length === 0 ? (
+                        <p className="text-center text-slate-400 text-sm mt-10">No recent activity.</p>
+                    ) : (
+                        activities.map((act, i) => (
+                            <div key={i} className="flex items-start gap-4">
+                                <div className={`mt-1 h-2 w-2 rounded-full ${act.type === 'SALE' ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-bold uppercase mb-0.5">
+                                        {new Date(act.date).toLocaleDateString()}
+                                    </p>
+                                    <p className="text-sm font-bold text-slate-800">{act.title}</p>
+                                    <p className="text-xs text-slate-500 font-mono mt-1">{formatCurrency(act.amount)}</p>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+        </div>
+
       </div>
     </div>
   );

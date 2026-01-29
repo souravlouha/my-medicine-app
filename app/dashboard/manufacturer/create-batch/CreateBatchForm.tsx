@@ -1,7 +1,7 @@
 "use client";
 
 import { createAdvancedBatchAction } from "@/lib/actions/manufacturer-actions";
-import { useState, useMemo, useEffect } from "react"; 
+import { useState, useMemo } from "react"; 
 import { useRouter } from "next/navigation";
 import QRCode from "react-qr-code";
 import Link from "next/link";
@@ -10,15 +10,7 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ✅ FIX: অটোমেটিক লাইভ URL ডিটেক্ট করার লজিক
-  const [baseUrl, setBaseUrl] = useState("");
-
-  useEffect(() => {
-    // ব্রাউজারে রান হওয়ার সময় এটি বর্তমান ডোমেইন (localhost বা vercel link) নিয়ে নেবে
-    if (typeof window !== "undefined") {
-      setBaseUrl(window.location.origin);
-    }
-  }, []);
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
   // 1. Form States
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -42,6 +34,7 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     const pId = e.target.value;
     setSelectedProductId(pId);
     const product = products.find(p => p.id === pId);
+    
     if (product) setMrp(product.basePrice || "");
     else setMrp("");
   };
@@ -51,7 +44,6 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     setLoading(true);
     const formData = new FormData(event.currentTarget);
     
-    // Explicitly append hierarchy data
     formData.append("totalCartons", totalCartons.toString());
     formData.append("boxesPerCarton", boxesPerCarton.toString());
     formData.append("stripsPerBox", stripsPerBox.toString());
@@ -59,9 +51,10 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     const res = await createAdvancedBatchAction(formData);
 
     if (res.success) {
+      // ✅ FIX: এখানে (res as any) ব্যবহার করা হয়েছে যাতে লাল দাগ না দেখায়
       setCreatedBatch({ 
-          id: res.batchId || "", 
-          no: res.batchNo || "" 
+          id: (res as any).batchId || "", 
+          no: (res as any).batchNo || "" 
       });
       router.refresh();
     } else {
@@ -105,7 +98,6 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
                
                <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6">
                   <div className="bg-white p-2 border border-gray-200 rounded-lg">
-                     {/* ✅ QR Code now uses dynamic baseUrl */}
                      <QRCode value={`${baseUrl}/verify/${cartonId}`} size={100} />
                   </div>
                   <div>

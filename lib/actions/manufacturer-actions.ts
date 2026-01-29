@@ -9,16 +9,19 @@ import bcrypt from "bcryptjs";
 // 1. PRODUCT CATALOG ACTIONS
 // ==========================================
 
+// ✅ Create New Product
 export async function createProductAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
-  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
     const timestamp = Date.now().toString().slice(-6);
     const randomNum = Math.floor(Math.random() * 99).toString().padStart(2, '0');
     const autoCode = `MED-${timestamp}${randomNum}`;
+    
+    // ট্যাবলেটের সংখ্যা ফর্ম থেকে নেওয়া হচ্ছে (ডিফল্ট ১০)
+    const tabletsPerStrip = parseInt(formData.get("tabletsPerStrip") as string) || 10; 
 
     await prisma.product.create({
       data: {
@@ -28,29 +31,31 @@ export async function createProductAction(formData: FormData) {
         type: (formData.get("type") as string).toUpperCase() as any,
         strength: formData.get("strength") as string,
         storageTemp: formData.get("storageTemp") as string,
-        // ✅ Base Price Save হচ্ছে (Manufacturer Price)
         basePrice: parseFloat(formData.get("basePrice") as string) || 0,
-        manufacturerId: userId
+        manufacturerId: userId,
+        tabletsPerStrip: tabletsPerStrip 
       }
     });
     
     revalidatePath("/dashboard/manufacturer/catalog");
-    return { success: true, message: "✅ Product added with Code: " + autoCode };
+    return { success: true, message: "✅ Product added: " + autoCode };
   } catch (error) {
     console.error("Create Product Error:", error);
     return { success: false, error: "Failed to create product" };
   }
 }
 
+// ✅ Update Existing Product
 export async function updateProductAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
-  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const productId = formData.get("productId") as string;
 
   try {
+    const tabletsPerStrip = parseInt(formData.get("tabletsPerStrip") as string) || 10;
+
     await prisma.product.update({
       where: { id: productId },
       data: {
@@ -60,37 +65,37 @@ export async function updateProductAction(formData: FormData) {
         strength: formData.get("strength") as string,
         storageTemp: formData.get("storageTemp") as string,
         basePrice: parseFloat(formData.get("basePrice") as string) || 0,
+        tabletsPerStrip: tabletsPerStrip 
       }
     });
     revalidatePath("/dashboard/manufacturer/catalog");
     return { success: true, message: "✅ Product Updated Successfully!" };
   } catch (error) {
+    console.error("Update Product Error:", error); 
     return { success: false, error: "Failed to update product" };
   }
 }
 
+// ✅ Get All Products for Manufacturer
 export async function getProducts() {
   const session = await auth();
   const userId = session?.user?.id;
-  
   if (!userId) return [];
-  
   return await prisma.product.findMany({ where: { manufacturerId: userId } });
 }
 
 
 // ==========================================
-// 2. ADVANCED BATCH CREATION
+// 2. ADVANCED BATCH CREATION & HIERARCHY
 // ==========================================
 
+// ✅ Create Batch with Full Hierarchy (Carton > Box > Strip)
 export async function createAdvancedBatchAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
-  
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const productId = formData.get("productId") as string;
-  // ✅ MRP Save হচ্ছে (Consumer Price)
   const mrp = parseFloat(formData.get("mrp") as string);
   const mfgDate = new Date(formData.get("mfgDate") as string);
   const expDate = new Date(formData.get("expDate") as string);
@@ -99,31 +104,34 @@ export async function createAdvancedBatchAction(formData: FormData) {
   const boxesPerCarton = parseInt(formData.get("boxesPerCarton") as string);
   const stripsPerBox = parseInt(formData.get("stripsPerBox") as string);
 
+  // মোট কোয়ান্টিটি ক্যালকুলেশন
   const totalQuantity = totalCartons * boxesPerCarton * stripsPerBox;
 
   try {
     const dateStr = new Date().toISOString().slice(0, 7).replace("-", ""); 
     const count = await prisma.batch.count({ where: { manufacturerId: userId } });
-    
     const uniqueSuffix = userId.slice(-4).toUpperCase();
     const autoBatchNumber = `B-${dateStr}-${(count + 1).toString().padStart(3, '0')}-${uniqueSuffix}`;
 
+    // ১. ব্যাচ তৈরি
     const batch = await prisma.batch.create({
       data: {
         batchNumber: autoBatchNumber,
         productId,
         manufacturerId: userId,
-        mrp, // Saved here
+        mrp, 
         totalQuantity: totalQuantity,
         mfgDate,
         expDate
       }
     });
 
+    // ২. ইনভেন্টরিতে যোগ করা
     await prisma.inventory.create({
       data: { userId, batchId: batch.id, currentStock: totalQuantity }
     });
 
+    // ৩. হায়ারার্কি জেনারেশন (অ্যাসিনক্রোনাস)
     await createBatchWithHierarchy(batch.id, userId, totalCartons, boxesPerCarton, stripsPerBox, autoBatchNumber);
 
     revalidatePath("/dashboard/manufacturer");
@@ -135,7 +143,7 @@ export async function createAdvancedBatchAction(formData: FormData) {
   }
 }
 
-// Helper: Hierarchy Generation
+// ✅ Helper: Generate Unit Hierarchy
 export async function createBatchWithHierarchy(
   batchId: string, 
   manufacturerId: string, 
@@ -209,6 +217,7 @@ export async function getDistributors() {
   }
 }
 
+// ✅ Approve Order (Distributor Request)
 export async function approveOrderAction(formData: FormData) {
   const orderId = formData.get("orderId") as string;
   if (!orderId) return { success: false, error: "Order ID missing" };
@@ -226,6 +235,7 @@ export async function approveOrderAction(formData: FormData) {
   }
 }
 
+// ✅ Ship Approved Order (Auto Shipment Creation)
 export async function shipApprovedOrderAction(formData: FormData) {
   const orderId = formData.get("orderId") as string;
   
@@ -244,6 +254,7 @@ export async function shipApprovedOrderAction(formData: FormData) {
       const shipmentItemsData = [];
 
       for (const item of order.items) {
+        // স্টক চেক করা
         const inventoryRecord = await tx.inventory.findFirst({
           where: { 
             userId: order.receiverId, 
@@ -256,6 +267,7 @@ export async function shipApprovedOrderAction(formData: FormData) {
 
         if (!inventoryRecord) throw new Error(`Stock mismatch for Product ID: ${item.productId}`);
 
+        // স্টক কমানো
         await tx.inventory.update({
           where: { id: inventoryRecord.id },
           data: { currentStock: { decrement: item.quantity } }
@@ -269,6 +281,7 @@ export async function shipApprovedOrderAction(formData: FormData) {
         shipmentTotal += (item.quantity * item.price);
       }
 
+      // শিপমেন্ট তৈরি
       await tx.shipment.create({
         data: {
           shipmentId: shipmentId,
@@ -280,6 +293,7 @@ export async function shipApprovedOrderAction(formData: FormData) {
         }
       });
 
+      // অর্ডার স্ট্যাটাস আপডেট
       await tx.order.update({
         where: { id: orderId },
         data: { status: "SHIPPED" }
@@ -300,9 +314,9 @@ export async function shipApprovedOrderAction(formData: FormData) {
   }
 }
 
+// ✅ Reject Order
 export async function rejectOrderAction(formData: FormData) {
     const orderId = formData.get("orderId") as string;
-    
     if (!orderId) return;
   
     try {
@@ -319,6 +333,7 @@ export async function rejectOrderAction(formData: FormData) {
     }
 }
 
+// ✅ Create Manual Shipment
 export async function createShipmentAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -368,9 +383,10 @@ export async function createShipmentAction(formData: FormData) {
 }
 
 // ==========================================
-// 4. RECALL ACTIONS
+// 4. RECALL & BULK ACTIONS
 // ==========================================
 
+// ✅ Recall Batch
 export async function recallBatchAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -397,6 +413,7 @@ export async function recallBatchAction(formData: FormData) {
   }
 }
 
+// ✅ Create Bulk Shipment
 export async function createBulkShipmentAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -463,6 +480,7 @@ export async function createBulkShipmentAction(formData: FormData) {
   }
 }
 
+// ✅ Update Manufacturer Profile
 export async function updateProfileAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -488,6 +506,7 @@ export async function updateProfileAction(formData: FormData) {
   }
 }
 
+// ✅ Create Distributor Account
 export async function createDistributor(formData: FormData) {
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;

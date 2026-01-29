@@ -8,8 +8,6 @@ export default function CatalogClient({ products }: { products: any[] }) {
   const [isEditing, setIsEditing] = useState<any | null>(null); 
   const [loading, setLoading] = useState(false);
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -38,12 +36,12 @@ export default function CatalogClient({ products }: { products: any[] }) {
       
       {/* 1. Header & View Toggle */}
       <div className="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl border border-gray-100 shadow-sm gap-4">
-         <div>
+          <div>
             <h2 className="text-2xl font-bold text-gray-800">📦 Product Inventory</h2>
             <p className="text-sm text-gray-500">Manage your medicine master catalog and set Base Prices.</p>
-         </div>
-         
-         <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-xl">
+          </div>
+          
+          <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-xl">
             <button 
               onClick={() => setViewMode("grid")}
               className={`px-4 py-2 rounded-lg text-sm font-bold transition ${viewMode === 'grid' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
@@ -56,7 +54,7 @@ export default function CatalogClient({ products }: { products: any[] }) {
             >
               📝 Title View
             </button>
-         </div>
+          </div>
       </div>
 
       {/* 2. Add / Edit Form */}
@@ -94,12 +92,30 @@ export default function CatalogClient({ products }: { products: any[] }) {
              </select>
            </div>
 
+           {/* ✅ NEW: Tablets Per Strip Input */}
+           <div>
+             <label className="text-xs font-bold text-gray-500 mb-1 block">Tablets per Strip (Unit Size)</label>
+             <div className="relative">
+                <input 
+                  name="tabletsPerStrip" 
+                  type="number" 
+                  min="1" 
+                  required 
+                  defaultValue={isEditing?.tabletsPerStrip || 10} 
+                  placeholder="e.g. 10" 
+                  className="w-full p-3 border rounded-xl focus:ring-2 ring-blue-500 outline-none" 
+                />
+                <span className="absolute right-3 top-3.5 text-xs font-bold text-gray-400 pointer-events-none">UNITS</span>
+             </div>
+             <p className="text-[10px] text-gray-400 mt-1">Used for calculating loose sales.</p>
+           </div>
+
            <div>
              <label className="text-xs font-bold text-gray-500 mb-1 block">Strength</label>
              <input name="strength" defaultValue={isEditing?.strength} placeholder="e.g. 500mg" required className="w-full p-3 border rounded-xl focus:ring-2 ring-blue-500 outline-none" />
            </div>
            
-           {/* ✅ Base Price Input (Distributor Buying Price) */}
+           {/* Base Price Input */}
            <div>
              <label className="text-xs font-bold text-gray-500 mb-1 block">Base Price (For Distributor)</label>
              <div className="relative">
@@ -146,6 +162,8 @@ export default function CatalogClient({ products }: { products: any[] }) {
                   
                   <div className="space-y-2 text-xs text-gray-500 border-t border-gray-100 pt-4">
                     <div className="flex justify-between"><span>Type</span> <span className="font-bold text-gray-700">{p.type}</span></div>
+                    {/* ✅ Shown in Grid View */}
+                    <div className="flex justify-between"><span>Unit Size</span> <span className="font-bold text-gray-700">{p.tabletsPerStrip || 10}/Strip</span></div>
                     <div className="flex justify-between"><span>Strength</span> <span className="font-bold text-gray-700">{p.strength}</span></div>
                     <div className="flex justify-between"><span>Base Price</span> <span className="font-bold text-green-600 text-sm">₹{p.basePrice?.toFixed(2) || "N/A"}</span></div>
                   </div>
@@ -169,7 +187,7 @@ export default function CatalogClient({ products }: { products: any[] }) {
                     <th className="p-4 pl-6">Code</th>
                     <th className="p-4">Brand Name</th>
                     <th className="p-4">Generic</th>
-                    <th className="p-4">Type/Strength</th>
+                    <th className="p-4">Type/Size</th>
                     <th className="p-4">Base Price</th>
                     <th className="p-4 text-right pr-6">Action</th>
                   </tr>
@@ -181,8 +199,12 @@ export default function CatalogClient({ products }: { products: any[] }) {
                       <td className="p-4 font-bold text-gray-800">{p.name}</td>
                       <td className="p-4 text-gray-500">{p.genericName}</td>
                       <td className="p-4 text-gray-500">
-                        <span className="inline-block bg-gray-100 px-2 py-0.5 rounded text-[10px] font-bold mr-2 uppercase">{p.type}</span>
-                        {p.strength}
+                        <div className="flex items-center gap-2">
+                            <span className="inline-block bg-gray-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{p.type}</span>
+                            {/* ✅ Shown in List View */}
+                            <span className="text-xs text-gray-400">({p.tabletsPerStrip || 10}/strip)</span>
+                        </div>
+                        <span className="text-xs font-semibold">{p.strength}</span>
                       </td>
                       <td className="p-4 font-bold text-green-600">₹{p.basePrice?.toFixed(2) || "N/A"}</td>
                       <td className="p-4 text-right pr-6">

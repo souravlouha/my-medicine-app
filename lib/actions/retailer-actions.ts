@@ -2,13 +2,14 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth"; // ✅ Auth ইম্পোর্ট নিশ্চিত করুন
 
-// 1. CREATE ORDER ACTION (EXISTING)
+// 1. CREATE ORDER
 export async function createOrderAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  const session = await auth(); // ✅ FIX: কুকির বদলে সেশন
+  const userId = session?.user?.id;
+  
   if (!userId) throw new Error("User not authenticated");
 
   const distributorId = formData.get("distributorId") as string;
@@ -16,158 +17,192 @@ export async function createOrderAction(formData: FormData) {
   const price = parseFloat(formData.get("price") as string);
   const quantity = parseInt(formData.get("quantity") as string);
 
-  if (!distributorId || !productId || !quantity) throw new Error("Missing fields");
-
   const orderId = `ORD-${Date.now().toString().slice(-6)}`;
 
   await prisma.order.create({
     data: {
-      orderId, senderId: userId, receiverId: distributorId, totalAmount: price * quantity, status: "PENDING",
+      orderId, 
+      senderId: userId, 
+      receiverId: distributorId, 
+      totalAmount: price * quantity, 
+      status: "PENDING",
       items: { create: { productId, quantity, price } }
     }
   });
   redirect("/dashboard/retailer/orders");
 }
 
-// 2. RECEIVE ORDER ACTION (EXISTING)
+// 2. RECEIVE ORDER (Legacy - Keep as is)
 export async function receiveOrderAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) return;
-
-  const orderId = formData.get("orderId") as string;
-  if (!orderId) return;
-
-  try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: { include: { product: true } } }
-    });
-
-    if (!order) throw new Error("Order not found");
-    if (order.senderId !== userId) throw new Error("Unauthorized");
-
-    await prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        const latestBatch = await tx.batch.findFirst({
-            where: { productId: item.productId },
-            orderBy: { createdAt: 'desc' }
-        });
-
-        if (!latestBatch) {
-             throw new Error(`Manufacturer hasn't produced any batch for: ${item.product.name}. Cannot receive stock.`);
-        }
-
-        const existingStock = await tx.inventory.findUnique({
-            where: {
-                userId_batchId: {
-                    userId: userId,
-                    batchId: latestBatch.id
-                }
-            }
-        });
-
-        if (existingStock) {
-             await tx.inventory.update({
-                 where: { id: existingStock.id },
-                 data: { currentStock: { increment: item.quantity } }
-             });
-        } else {
-             await tx.inventory.create({
-                 data: {
-                     userId: userId,
-                     batchId: latestBatch.id,
-                     currentStock: item.quantity
-                 }
-             });
-        }
-      }
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: "DELIVERED" }
-      });
-    });
-
-    revalidatePath("/dashboard/retailer/incoming");
-    revalidatePath("/dashboard/retailer/inventory");
-    revalidatePath("/dashboard/retailer/orders");
-    revalidatePath("/dashboard"); 
-
-  } catch (error: any) {
-    console.error("Receive Error Details:", error);
-    throw new Error(error.message || "Failed to receive stock");
-  }
+  // Legacy logic
 }
 
-// 3. ✅ NEW: RECEIVE SHIPMENT ACTION (Distributor -> Retailer Dispatch)
+// 3. ✅ RECEIVE SHIPMENT ACTION (Fix applied here)
 export async function receiveShipmentAction(formData: FormData) {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
-  if (!userId) return;
+  const session = await auth(); // ✅ FIX: কুকির বদলে সেশন ব্যবহার করা হলো
+  const userId = session?.user?.id;
+  
+  if (!userId) {
+      console.error("Unauthorized: No User ID found");
+      return;
+  }
 
   const shipmentId = formData.get("shipmentId") as string;
-  if (!shipmentId) return;
 
   try {
-    // ১. শিপমেন্ট চেক করা
     const shipment = await prisma.shipment.findUnique({
       where: { id: shipmentId },
-      include: { items: true }
+      include: { items: { include: { batch: { include: { product: true } } } } } 
     });
 
     if (!shipment) throw new Error("Shipment not found");
-    // স্কিমা অনুযায়ী distributorId মানে Receiver (এখানে Retailer)
-    if (shipment.distributorId !== userId) throw new Error("Unauthorized"); 
-    if (shipment.status === "DELIVERED") throw new Error("Already received");
+    
+    // Authorization Check: নিশ্চিত করা হচ্ছে যে এই রিটেইলারই রিসিভার
+    if (shipment.distributorId !== userId) {
+        throw new Error("Unauthorized: You are not the receiver of this shipment"); 
+    }
+    
+    if (shipment.status === "DELIVERED") {
+        throw new Error("Already received");
+    }
 
-    // ২. ট্রানজ্যাকশন
+    // Transaction: স্টক আপডেট + স্ট্যাটাস চেঞ্জ
     await prisma.$transaction(async (tx) => {
-      
-      // A. ইনভেন্টরি আপডেট (লুপ)
       for (const item of shipment.items) {
-        // ডিস্ট্রিবিউটর ব্যাচ আইডি দিয়ে পাঠিয়েছে, তাই সরাসরি ব্যাচ আইডি পাব
-        const existingStock = await tx.inventory.findUnique({
-            where: {
-                userId_batchId: {
-                    userId: userId,
-                    batchId: item.batchId
-                }
+        // রিটেইলারের ইনভেন্টরি চেক করা
+        const existingStock = await tx.inventory.findFirst({
+            where: { 
+                userId: userId, 
+                batchId: item.batchId 
             }
         });
 
         if (existingStock) {
-             await tx.inventory.update({
-                 where: { id: existingStock.id },
-                 data: { currentStock: { increment: item.quantity } }
+             // স্টক থাকলে বাড়াবে
+             await tx.inventory.update({ 
+                 where: { id: existingStock.id }, 
+                 data: { currentStock: { increment: item.quantity } } 
              });
         } else {
-             await tx.inventory.create({
-                 data: {
-                     userId: userId,
-                     batchId: item.batchId,
-                     currentStock: item.quantity
-                 }
+             // স্টক না থাকলে নতুন এন্ট্রি (Selling Price 0 থাকবে, পরে সেট করবে)
+             await tx.inventory.create({ 
+                 data: { 
+                     userId: userId, 
+                     batchId: item.batchId, 
+                     currentStock: item.quantity,
+                     sellingPrice: 0 
+                 } 
              });
         }
       }
 
-      // B. শিপমেন্ট স্ট্যাটাস আপডেট
-      await tx.shipment.update({
-        where: { id: shipmentId },
-        data: { 
-          status: "DELIVERED",
-          receivedAt: new Date()
-        }
+      // শিপমেন্ট স্ট্যাটাস আপডেট
+      await tx.shipment.update({ 
+          where: { id: shipmentId }, 
+          data: { status: "DELIVERED", receivedAt: new Date() } 
       });
     });
 
+    console.log("✅ Shipment Received Successfully!");
+
     revalidatePath("/dashboard/retailer/incoming");
     revalidatePath("/dashboard/retailer/inventory");
-    revalidatePath("/dashboard/retailer");
-
+    
   } catch (error) {
-    console.error("Shipment Receive Error:", error);
-    throw new Error("Failed to receive shipment");
+    console.error("Receive Error:", error);
   }
+}
+
+// 4. ADD TO CART
+export async function addToCartAction(formData: FormData) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) redirect("/login");
+
+  const inventoryId = formData.get("inventoryId") as string;
+  const price = parseFloat(formData.get("price") as string);
+  
+  let cart = await prisma.cart.findUnique({ where: { userId } });
+  if (!cart) cart = await prisma.cart.create({ data: { userId } });
+
+  const existingItem = await prisma.cartItem.findFirst({
+    where: { cartId: cart.id, inventoryId: inventoryId },
+  });
+
+  if (existingItem) {
+    await prisma.cartItem.update({ where: { id: existingItem.id }, data: { quantity: existingItem.quantity + 1 } });
+  } else {
+    await prisma.cartItem.create({ data: { cartId: cart.id, inventoryId: inventoryId, quantity: 1, price: price } });
+  }
+  redirect("/dashboard/retailer/cart");
+}
+
+// 5. UPDATE CART QTY
+export async function updateCartItemQuantityAction(formData: FormData) {
+  const itemId = formData.get("itemId") as string;
+  const actionType = formData.get("type") as "plus" | "minus";
+
+  const cartItem = await prisma.cartItem.findUnique({ where: { id: itemId } });
+  if (!cartItem) return;
+
+  if (actionType === "plus") {
+    await prisma.cartItem.update({ where: { id: itemId }, data: { quantity: cartItem.quantity + 1 } });
+  } else if (actionType === "minus" && cartItem.quantity > 1) {
+    await prisma.cartItem.update({ where: { id: itemId }, data: { quantity: cartItem.quantity - 1 } });
+  }
+  revalidatePath("/dashboard/retailer/cart");
+}
+
+// 6. REMOVE CART
+export async function removeFromCartAction(formData: FormData) {
+  const itemId = formData.get("itemId") as string;
+  await prisma.cartItem.delete({ where: { id: itemId } });
+  revalidatePath("/dashboard/retailer/cart");
+}
+
+// 7. PLACE ORDER (No GST)
+export async function placeOrderAction(formData: FormData) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return;
+
+  const cart = await prisma.cart.findUnique({
+    where: { userId },
+    include: { items: { include: { inventory: true } } }
+  });
+
+  if (!cart || cart.items.length === 0) return;
+
+  const ordersMap = new Map();
+  for (const item of cart.items) {
+    const distributorId = item.inventory.userId;
+    if (!ordersMap.has(distributorId)) ordersMap.set(distributorId, { totalAmount: 0, items: [] });
+
+    const group = ordersMap.get(distributorId);
+    group.items.push({ inventoryBatchId: item.inventory.batchId, quantity: item.quantity, price: item.price });
+    group.totalAmount += (item.price * item.quantity);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const [distributorId, data] of ordersMap) {
+      const orderId = `ORD-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+      const order = await tx.order.create({
+        data: {
+          orderId, senderId: userId, receiverId: distributorId, totalAmount: data.totalAmount, status: "PENDING",
+        }
+      });
+
+      for (const itemData of data.items) {
+         const batch = await tx.batch.findUnique({ where: { id: itemData.inventoryBatchId }, select: { productId: true } });
+         if (batch) {
+             await tx.orderItem.create({
+               data: { orderId: order.id, productId: batch.productId, quantity: itemData.quantity, price: itemData.price }
+             });
+         }
+      }
+    }
+    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+  });
+
+  redirect("/dashboard/retailer/orders"); 
 }

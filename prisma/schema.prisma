@@ -22,7 +22,7 @@ model User {
   // 🏢 Company Profile
   licenseNo      String?  
   licenseExp     DateTime?
-  gstNo          String?  // ✅ GST Number
+  gstNo          String?  
   address        String?
   phone          String?
   geoLat         Float?      
@@ -42,20 +42,26 @@ model User {
 
   // 📉 Dashboard Data Sources
   inventory      Inventory[]  
-  sales          SalesRecord[] 
+  sales          SalesRecord[] @relation("SalesBy") // ✅ Added Relation Name
    
   // 🚚 Supply Chain
   sentShipments         Shipment[]    @relation("Sender")
   receivedShipments     Shipment[]    @relation("Receiver")
    
-  // 🆕 B2B Ordering
-  placedOrders          Order[]       @relation("PlacedOrders")   // Orders I placed
-  receivedOrders        Order[]       @relation("ReceivedOrders") // Orders I received
+  // 🆕 B2B Ordering (Distributor <-> Retailer)
+  placedOrders          Order[]       @relation("PlacedOrders")   
+  receivedOrders        Order[]       @relation("ReceivedOrders") 
+
+  // 🛒 Retailer Shopping Cart
+  cart                  Cart?
+
+  // 🏪 Retailer Sales to Consumer (POS)
+  retailSales           RetailSale[]
 
   // 🔔 Alerts & Actions
   notifications         Notification[] 
-  returnsSent           Return[]        @relation("ReturnSender")
-  returnsReceived       Return[]        @relation("ReturnReceiver")
+  returnsSent           Return[]       @relation("ReturnSender")
+  returnsReceived       Return[]       @relation("ReturnReceiver")
   auditLogs             AuditLog[]      
 
   // 🔥 Activity Log
@@ -88,6 +94,12 @@ model Product {
   strength        String?   
   type            MedicineType 
    
+  // ✅ কনভার্সন লজিক (এক পাতায় কয়টি ট্যাবলেট থাকে)
+  tabletsPerStrip Int      @default(10) 
+  
+  // ✅ স্ক্যান করার জন্য গ্লোবাল বারকোড
+  barcode         String?  
+
   storageTemp     String?   
   isNarcotic      Boolean  @default(false) 
    
@@ -126,7 +138,7 @@ model Batch {
   expDate         DateTime 
    
   mrp             Float
-  totalQuantity   Int            
+  totalQuantity   Int           
    
   // 🔗 Tracking
   inventory       Inventory[]
@@ -146,7 +158,7 @@ model Batch {
 }
 
 // ==========================================
-// 4. INVENTORY (Updated)
+// 4. INVENTORY (Updated for Retail Logic)
 // ==========================================
 model Inventory {
   id             String   @id @default(uuid())
@@ -157,18 +169,79 @@ model Inventory {
   batchId        String
   batch          Batch    @relation(fields: [batchId], references: [id])
   
+  // ✅ ফুল স্ট্রিপ স্টক (Full Strips)
   currentStock   Int      
   
-  // ✅ NEW: ডিস্ট্রিবিউটর এখানে নিজের দাম সেট করবে (Discounted Price)
-  sellingPrice   Float?   
+  // ✅ খোলা ট্যাবলেটের স্টক (Loose Tablets)
+  looseStock     Int      @default(0) 
+  
+  // ✅ ডিস্ট্রিবিউটর বা রিটেইলারের সেট করা দাম
+  sellingPrice   Float    @default(0) 
 
   updatedAt      DateTime @updatedAt
 
   @@unique([userId, batchId]) 
+  
+  // Relations
+  cartItems      CartItem[]
+  retailSales    RetailSale[]
 }
 
 // ==========================================
-// 5. UNIT / QR HIERARCHY
+// 5. RETAILER CART (Buying from Distributor)
+// ==========================================
+model Cart {
+  id        String      @id @default(uuid())
+  userId    String      @unique
+  user      User        @relation(fields: [userId], references: [id])
+  items     CartItem[]
+  updatedAt DateTime    @updatedAt
+}
+
+model CartItem {
+  id          String    @id @default(uuid())
+  cartId      String
+  cart        Cart      @relation(fields: [cartId], references: [id])
+  
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  
+  quantity    Int       @default(1)
+  price       Float     // যে দামে কার্টে যোগ করা হয়েছে
+}
+
+// ==========================================
+// 6. RETAIL SALES (POS - Selling to Consumer)
+// ==========================================
+model RetailSale {
+  id             String   @id @default(uuid())
+  
+  retailerId     String   
+  retailer       User     @relation(fields: [retailerId], references: [id])
+  
+  inventoryId    String
+  inventory      Inventory @relation(fields: [inventoryId], references: [id])
+  
+  // কি বিক্রি হলো? (STRIP নাকি TABLET)
+  unitType       SaleUnitType 
+  
+  quantity       Int      
+  totalPrice     Float    
+  
+  customerName   String?  
+  customerPhone  String?  
+  paymentMethod  String   @default("CASH") 
+  
+  soldAt         DateTime @default(now())
+}
+
+enum SaleUnitType {
+  STRIP   // পুরো পাতা
+  TABLET  // খোলা ট্যাবলেট
+}
+
+// ==========================================
+// 7. UNIT / QR HIERARCHY
 // ==========================================
 model Unit {
   id              String   @id @default(uuid())
@@ -208,7 +281,7 @@ enum UnitStatus {
 }
 
 // ==========================================
-// 6. SHIPMENT & LOGISTICS
+// 8. SHIPMENT & LOGISTICS
 // ==========================================
 model Shipment {
   id              String   @id @default(uuid())
@@ -253,7 +326,7 @@ enum ShipmentStatus {
 }
 
 // ==========================================
-// 7. B2B ORDER MANAGEMENT
+// 9. B2B ORDER MANAGEMENT
 // ==========================================
 model Order {
   id              String   @id @default(uuid())
@@ -295,20 +368,23 @@ enum OrderStatus {
 }
 
 // ==========================================
-// 8. SALES & ANALYTICS
+// 10. SALES & ANALYTICS (Legacy/General)
 // ==========================================
 model SalesRecord {
   id              String   @id @default(uuid())
    
   sellerId        String    
-  seller          User      @relation(fields: [sellerId], references: [id])
+  seller          User      @relation("SalesBy", fields: [sellerId], references: [id])
    
   batchId         String
   batch           Batch    @relation(fields: [batchId], references: [id])
    
-  quantity        Int            
+  quantity        Int           
   totalPrice      Float        
-  buyerType       String?        
+  buyerType       String?       
+  
+  // ✅ NEW: Added unitType for reporting
+  unitType        String   @default("STRIP") 
    
   date            DateTime @default(now())
 
@@ -316,7 +392,7 @@ model SalesRecord {
 }
 
 // ==========================================
-// 9. NOTIFICATIONS & ALERTS
+// 11. NOTIFICATIONS & ALERTS
 // ==========================================
 model Notification {
   id        String   @id @default(uuid())
@@ -334,12 +410,12 @@ model Notification {
 
 enum NotifType {
   INFO      
-  WARNING    
+  WARNING   
   ALERT        
 }
 
 // ==========================================
-// 10. RECALL & RETURNS
+// 12. RECALL & RETURNS
 // ==========================================
 model Recall {
   id              String   @id @default(uuid())
@@ -377,7 +453,7 @@ model Return {
 }
 
 // ==========================================
-// 11. PUBLIC SCAN & FRAUD DETECTION
+// 13. PUBLIC SCAN & FRAUD DETECTION
 // ==========================================
 model ScanHistory {
   id              String   @id @default(uuid())
@@ -385,15 +461,15 @@ model ScanHistory {
   unit            Unit     @relation(fields: [unitId], references: [id])
    
   ipAddress       String?
-  location        String?     
-  device          String?     
+  location        String?      
+  device          String?      
    
   scannedAt       DateTime @default(now())
   isSuspicious    Boolean @default(false) 
 }
 
 // ==========================================
-// 12. AUDIT LOGS (Security)
+// 14. AUDIT LOGS (Security)
 // ==========================================
 model AuditLog {
   id        String   @id @default(uuid())
@@ -408,7 +484,7 @@ model AuditLog {
 }
 
 // ==========================================
-// 13. GLOBAL SUPPLY CHAIN TRACKING
+// 15. GLOBAL SUPPLY CHAIN TRACKING
 // ==========================================
 model BatchMovement {
   id                  String              @id @default(uuid())
@@ -431,14 +507,14 @@ model BatchMovement {
   parent              BatchMovement?  @relation("MovementHierarchy", fields: [parentId], references: [id])
   children            BatchMovement[] @relation("MovementHierarchy")
 
-  createdAt           DateTime          @default(now())
+  createdAt           DateTime         @default(now())
 
   @@index([batchId])
   @@index([parentId])
 }
 
 // ==========================================
-// 14. ACTIVITY LOG
+// 16. ACTIVITY LOG
 // ==========================================
 model ActivityLog {
   id        String   @id @default(uuid())
@@ -452,7 +528,7 @@ model ActivityLog {
 }
 
 // ==========================================
-// 15. PRODUCTION & PRINT JOBS
+// 17. PRODUCTION & PRINT JOBS
 // ==========================================
 model PrintJob {
   id               String       @id @default(uuid())
@@ -464,7 +540,7 @@ model PrintJob {
   operatorId       String?      
   operator         User?        @relation("JobOperator", fields: [operatorId], references: [id])
    
-  machineName      String?       
+  machineName      String?        
    
   targetQuantity   Int          
   printedQuantity  Int          @default(0) 
@@ -479,7 +555,7 @@ model PrintJob {
 }
 
 // ==========================================
-// 16. PUBLIC REPORTS
+// 18. PUBLIC REPORTS
 // ==========================================
 model Report {
   id             String   @id @default(uuid())
