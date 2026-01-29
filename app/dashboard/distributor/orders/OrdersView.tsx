@@ -9,9 +9,10 @@ import {
   XCircle, Package, User, Calendar, CreditCard, ChevronDown, ChevronUp, Box, FileText, 
   TrendingUp, PieChart as PieChartIcon, Phone, Mail, MapPin, AlertCircle
 } from "lucide-react";
-import { updateOrderStatusAction } from "@/lib/actions/distributor-actions";
+import { updateOrderStatusAction, shipOrderToRetailerAction } from "@/lib/actions/distributor-actions";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "sonner"; // ✅ এখন আর এরর দেবে না (ইনস্টল করার পর)
 
 // Props Definition
 interface Product {
@@ -20,9 +21,10 @@ interface Product {
 }
 
 interface OrderItem {
+  id: string; 
   product: Product;
   quantity: number;
-  price?: number; 
+  price: number; 
 }
 
 interface Order {
@@ -51,18 +53,24 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
     );
   };
 
+  // ✅ TYPE SAFE WRAPPER FOR ACTIONS (এটিই লাল দাগ সরাবে)
+  // ফর্ম অ্যাকশন সরাসরি প্রমিস রিটার্ন করলে টাইপস্ক্রিপ্ট ধরে, তাই আমরা এটিকে হ্যান্ডেল করছি
+  const handleUpdateStatus = async (formData: FormData) => {
+      const res = await updateOrderStatusAction(formData);
+      if (res?.success) toast.success(res.message);
+      else toast.error(res?.error || "Failed to update");
+  };
+
+  const handleShipOrder = async (formData: FormData) => {
+      const res = await shipOrderToRetailerAction(formData);
+      if (res?.success) toast.success(res.message);
+      else toast.error(res?.error || "Failed to ship");
+  };
+
   // --- STATISTICS CALCULATIONS ---
   const totalRevenue = receivedOrders.reduce((acc, o) => acc + (o.status !== 'CANCELLED' ? o.totalAmount : 0), 0);
-  
-  // ✅ FIX: Variable name is now 'pendingOrders' to match usage below
   const pendingOrders = receivedOrders.filter(o => o.status === "PENDING").length;
   
-  const pendingValue = receivedOrders.filter(o => o.status === "PENDING").reduce((acc, o) => acc + o.totalAmount, 0);
-  
-  const completionRate = receivedOrders.length > 0 
-    ? ((receivedOrders.filter(o => o.status === "DELIVERED" || o.status === "SHIPPED").length / receivedOrders.length) * 100).toFixed(0) 
-    : 0;
-
   // Chart Data
   const getChartData = (orders: Order[]) => {
     const counts = orders.reduce((acc: any, o) => {
@@ -74,9 +82,8 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
 
   const incomingPieData = getChartData(receivedOrders);
   const outgoingPieData = getChartData(sentOrders);
-  const COLORS = ['#F59E0B', '#10B981', '#3B82F6', '#EF4444']; 
 
-  // ✅ FIX: timeAgo function added inside component
+  // Time Ago Helper
   const timeAgo = (date: Date) => {
     const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
     let interval = seconds / 31536000;
@@ -102,7 +109,6 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
     doc.setDrawColor(200);
     doc.line(14, 35, 196, 35);
     
-    // Summary Table
     autoTable(doc, {
       startY: 45,
       head: [["Metric", "Value"]],
@@ -113,16 +119,13 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
         ["Outgoing Purchases", sentOrders.length.toString()]
       ],
       theme: 'plain',
-      // ✅ FIX: Changed 'width' to 'cellWidth' to fix type error
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 80 } } 
     });
 
-    // Orders Table
     let finalY = (doc as any).lastAutoTable.finalY + 10;
     const tableTitle = activeTab === "INCOMING" ? "Incoming Orders (From Retailers)" : "My Purchases (Outgoing)";
     doc.text(tableTitle, 14, finalY);
 
-    // ✅ FIX: Handling undefined values for PDF table
     const rows = (activeTab === "INCOMING" ? receivedOrders : sentOrders).map(o => [
         o.orderId || "", 
         (o.sender?.name || o.receiver?.name || "N/A"), 
@@ -159,13 +162,12 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
       {/* --- 1. KPI HEADER --- */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <KPICard title="Incoming Orders" value={receivedOrders.length} icon={<ArrowDownLeft/>} color="blue"/>
-        {/* ✅ FIX: Using 'pendingOrders' variable correctly */}
         <KPICard title="Pending Action" value={pendingOrders} icon={<Clock/>} color="amber"/>
         <KPICard title="My Purchases" value={sentOrders.length} icon={<ShoppingCart/>} color="purple"/>
         <KPICard title="Total Sales" value={`₹${(totalRevenue/1000).toFixed(1)}k`} icon={<CreditCard/>} color="emerald"/>
       </div>
 
-      {/* --- 2. MIDDLE SECTION (Restored Clean Style + Report Button) --- */}
+      {/* --- 2. MIDDLE SECTION --- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          <ChartCard title="Incoming Status" data={incomingPieData} emptyMessage="No incoming orders" color="#3B82F6"/>
          <ChartCard title="Purchases Status" data={outgoingPieData} emptyMessage="No purchases made" color="#8B5CF6"/>
@@ -219,7 +221,6 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
                                         {activeTab === "INCOMING" ? order.sender?.name : order.receiver?.name}
                                     </span>
                                     <span className="hidden sm:inline text-slate-300">|</span>
-                                    {/* ✅ FIX: timeAgo usage */}
                                     <span className="flex items-center gap-1" title={new Date(order.createdAt).toDateString()}>
                                         <Calendar size={12}/> {timeAgo(order.createdAt)}
                                     </span>
@@ -284,7 +285,7 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
                                 {/* 3. Info & Actions Sidebar */}
                                 <div className="w-full lg:w-80 space-y-4">
                                     
-                                    {/* Contact Info (Icons Fixed) */}
+                                    {/* Contact Info */}
                                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                         <h5 className="text-xs font-bold text-slate-400 uppercase mb-3">Contact Details</h5>
                                         <div className="space-y-3 text-sm">
@@ -322,18 +323,38 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
                                         </div>
                                     </div>
 
-                                    {/* Action Buttons */}
+                                    {/* Action Buttons (✅ FIX: Using proper handlers to avoid type errors) */}
                                     {activeTab === "INCOMING" && order.status === "PENDING" && (
                                         <div className="flex gap-2">
-                                            <form action={updateOrderStatusAction} className="flex-1"><input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="newStatus" value="CANCELLED" /><button className="w-full py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold rounded-lg transition">Reject</button></form>
-                                            <form action={updateOrderStatusAction} className="flex-1"><input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="newStatus" value="APPROVED" /><button className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition shadow-lg shadow-slate-200">Approve</button></form>
+                                            {/* Reject Button */}
+                                            <form action={handleUpdateStatus} className="flex-1">
+                                                <input type="hidden" name="orderId" value={order.id} />
+                                                <input type="hidden" name="newStatus" value="CANCELLED" />
+                                                <button type="submit" className="w-full py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold rounded-lg transition">
+                                                    Reject
+                                                </button>
+                                            </form>
+                                            {/* Approve Button */}
+                                            <form action={handleUpdateStatus} className="flex-1">
+                                                <input type="hidden" name="orderId" value={order.id} />
+                                                <input type="hidden" name="newStatus" value="APPROVED" />
+                                                <button type="submit" className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition shadow-lg shadow-slate-200">
+                                                    Approve
+                                                </button>
+                                            </form>
                                         </div>
                                     )}
+                                    
                                     {activeTab === "INCOMING" && order.status === "APPROVED" && (
-                                        <form action={updateOrderStatusAction}><input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="newStatus" value="SHIPPED" /><button className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-purple-200 flex items-center justify-center gap-2"><Truck size={16}/> Dispatch & Complete</button></form>
+                                        <form action={handleShipOrder}>
+                                            <input type="hidden" name="orderId" value={order.id} />
+                                            {/* Ship Order */}
+                                            <button type="submit" className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-purple-200 flex items-center justify-center gap-2">
+                                                <Truck size={16}/> Dispatch & Complete
+                                            </button>
+                                        </form>
                                     )}
                                     
-                                    {/* Shipped Status (No Button) */}
                                     {(order.status === "SHIPPED" || order.status === "DELIVERED") && (
                                         <div className="w-full py-3 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2">
                                             <CheckCircle size={16}/> Order Completed Successfully
@@ -355,7 +376,7 @@ export default function OrdersView({ sentOrders, receivedOrders }: Props) {
   );
 }
 
-// ✅ FIX: Sub-Components with Icons Imported
+// Sub-Components
 function KPICard({ title, value, icon, color }: any) {
     const colors: any = { blue: "text-blue-600 bg-blue-50", amber: "text-amber-600 bg-amber-50", purple: "text-purple-600 bg-purple-50", emerald: "text-emerald-600 bg-emerald-50" };
     return (
