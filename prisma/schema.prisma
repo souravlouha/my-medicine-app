@@ -120,6 +120,7 @@ enum MedicineType {
   INJECTION
   CREAM
   DROPS
+  SPRAY  // ✅ এটি যোগ করুন
 }
 
 // ==========================================
