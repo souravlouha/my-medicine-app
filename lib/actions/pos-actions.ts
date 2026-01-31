@@ -4,24 +4,26 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 
-// টাইপ সেফটির জন্য ইন্টারফেস (লজিক বোঝার সুবিধার্থে)
+// টাইপ সেফটির জন্য ইন্টারফেস
 interface CartItem {
-  inventoryId: string;
+  inventoryId: string | null; // ম্যানুয়াল আইটেমের জন্য null হতে পারে
   name: string;
   quantity: number;
-  unitType: "STRIP" | "TABLET" | "UNIT"; // 'UNIT' for Syrup/Injection
+  unitType: "STRIP" | "TABLET" | "UNIT"; 
   price: number;
   totalPrice: number;
+  isManual?: boolean; // ✅ ম্যানুয়াল আইটেম ফ্ল্যাগ
 }
 
 export async function processRetailSale(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
 
-  if (!userId) return { success: false, error: "Unauthorized" };
+  if (!userId) return { success: false, error: "Unauthorized access" };
 
-  // ১. কার্ট ডাটা রিসিভ করা (JSON String হিসেবে)
+  // ১. কার্ট ডাটা রিসিভ করা
   const cartDataRaw = formData.get("cartData") as string;
+  const totalAmount = parseFloat(formData.get("totalAmount") as string);
   
   if (!cartDataRaw) {
       return { success: false, error: "Cart is empty or invalid data!" };
@@ -38,85 +40,108 @@ export async function processRetailSale(formData: FormData) {
     return { success: false, error: "No items to sell." };
   }
 
+  // ✅ সব রেকর্ডের জন্য একই সময় ব্যবহার করা হবে
+  const transactionDate = new Date();
+
   try {
-    // ২. ডাটাবেস ট্রানজ্যাকশন (সব আইটেম একসাথে প্রসেস হবে)
+    // ২. ডাটাবেস ট্রানজ্যাকশন শুরু
     await prisma.$transaction(async (tx) => {
       
-      // 🔄 লুপ: কার্টের প্রতিটি আইটেমের জন্য
+      // 🔄 লুপ: প্রতিটি আইটেম প্রসেস করা হবে
       for (const item of cartItems) {
           
-          // A. ইনভেন্টরি চেক
-          const inventory = await tx.inventory.findUnique({
-            where: { id: item.inventoryId },
-            include: { batch: { include: { product: true } } }
-          });
+          let batchIdToSave = null; // ডিফল্ট নাল (ম্যানুয়াল আইটেমের জন্য)
 
-          if (!inventory) throw new Error(`Stock item not found for: ${item.name}`);
+          // ---------------------------------------------------------
+          // CASE A: REAL INVENTORY ITEM (স্টক চেক ও আপডেট হবে)
+          // ---------------------------------------------------------
+          if (!item.isManual && item.inventoryId) {
+              
+              // ১. ইনভেন্টরি ডাটা আনা
+              const inventory = await tx.inventory.findUnique({
+                where: { id: item.inventoryId },
+                include: { batch: { include: { product: true } } }
+              });
 
-          // ভেরিয়েবল সেটআপ
-          const tabletsPerStrip = inventory.batch.product.tabletsPerStrip || 1;
-          let currentStripStock = inventory.currentStock; // Full Strip / Box / Unit
-          let currentLooseStock = inventory.looseStock;   // Loose Tablets / Vials
+              if (!inventory) throw new Error(`Stock item not found for: ${item.name}`);
 
-          // B. স্টক ক্যালকুলেশন লজিক (Legacy Logic Preserved 🧠)
-          
-          if (item.unitType === "STRIP" || item.unitType === "UNIT") {
-            // কেস ১: পুরো পাতা বা বোতল বিক্রি
-            if (currentStripStock < item.quantity) {
-              throw new Error(`Insufficient stock for ${item.name}! Available: ${currentStripStock} ${item.unitType === 'UNIT' ? 'Units' : 'Strips'}`);
-            }
-            currentStripStock -= item.quantity;
-          } 
-          else if (item.unitType === "TABLET") {
-            // কেস ২: খুচরা ট্যাবলেট বা ভায়াল বিক্রি
-            let needed = item.quantity;
+              // ব্যাচ আইডি সেট করা (Sales History এর জন্য)
+              batchIdToSave = inventory.batchId;
 
-            if (currentLooseStock >= needed) {
-              // লুজ স্টকে পর্যাপ্ত আছে
-              currentLooseStock -= needed;
-            } else {
-              // লুজ স্টকে কম আছে, স্ট্রিপ ভাঙতে হবে
-              needed -= currentLooseStock; 
-              currentLooseStock = 0; // যা ছিল সব নিলাম
+              // ২. স্টক ভেরিয়েবল সেটআপ
+              const tabletsPerStrip = inventory.batch.product.tabletsPerStrip || 1;
+              let currentStripStock = inventory.currentStock; // Full Strip / Box / Unit
+              let currentLooseStock = inventory.looseStock;   // Loose Tablets / Vials
 
-              // কতগুলো স্ট্রিপ ভাঙতে হবে?
-              const stripsToBreak = Math.ceil(needed / tabletsPerStrip);
+              // ৩. স্টক ক্যালকুলেশন লজিক
+              if (item.unitType === "STRIP" || item.unitType === "UNIT") {
+                // --- পুরো পাতা বা ইউনিট বিক্রি ---
+                if (currentStripStock < item.quantity) {
+                  throw new Error(`Insufficient stock for ${item.name}! Available: ${currentStripStock} ${item.unitType === 'UNIT' ? 'Units' : 'Strips'}`);
+                }
+                currentStripStock -= item.quantity;
+              } 
+              else if (item.unitType === "TABLET") {
+                // --- খুচরা ট্যাবলেট বিক্রি ---
+                let needed = item.quantity;
 
-              if (currentStripStock < stripsToBreak) {
-                throw new Error(`Not enough stock of ${item.name} to break! Need ${stripsToBreak} strips/boxes.`);
+                if (currentLooseStock >= needed) {
+                  // লুজ স্টকে পর্যাপ্ত আছে
+                  currentLooseStock -= needed;
+                } else {
+                  // লুজ স্টকে কম আছে, নতুন পাতা ভাঙতে হবে
+                  needed -= currentLooseStock; 
+                  currentLooseStock = 0; // যা ছিল সব নিলাম
+
+                  // কতগুলো পাতা ভাঙতে হবে?
+                  const stripsToBreak = Math.ceil(needed / tabletsPerStrip);
+
+                  if (currentStripStock < stripsToBreak) {
+                    throw new Error(`Not enough stock of ${item.name} to break! Need ${stripsToBreak} strips.`);
+                  }
+
+                  // পাতা ভাঙা হলো
+                  currentStripStock -= stripsToBreak;
+                  
+                  // নতুন লুজ স্টক ক্যালকুলেশন
+                  const newLooseTablets = (stripsToBreak * tabletsPerStrip) - needed;
+                  currentLooseStock = newLooseTablets;
+                }
               }
 
-              // স্ট্রিপ ভাঙা হলো
-              currentStripStock -= stripsToBreak;
-              
-              // নতুন লুজ স্টক ক্যালকুলেশন
-              // (যতগুলো ভাঙলাম * প্রতিটিতে কয়টি) - (কাস্টমারকে যা দিলাম)
-              const newLooseTablets = (stripsToBreak * tabletsPerStrip) - needed;
-              currentLooseStock = newLooseTablets;
-            }
+              // ৪. ডাটাবেসে ইনভেন্টরি আপডেট (Stock Update)
+              await tx.inventory.update({
+                where: { id: item.inventoryId },
+                data: {
+                  currentStock: currentStripStock,
+                  looseStock: currentLooseStock
+                }
+              });
           }
+          
+          // ---------------------------------------------------------
+          // CASE B: MANUAL ITEM (শুধু সেলস রেকর্ড হবে, স্টক আপডেট নেই)
+          // ---------------------------------------------------------
+          // এখানে কোনো 'continue' নেই, তাই কোড নিচে নামবে এবং Sales Record তৈরি করবে।
 
-          // C. ইনভেন্টরি আপডেট (Stock Update)
-          await tx.inventory.update({
-            where: { id: item.inventoryId },
-            data: {
-              currentStock: currentStripStock,
-              looseStock: currentLooseStock
-            }
-          });
-
-          // D. সেলস রেকর্ড তৈরি (Individual Record for each item)
+          // ৫. সেলস রেকর্ড তৈরি (সবার জন্য)
           await tx.salesRecord.create({
             data: {
               sellerId: userId,
-              batchId: inventory.batchId,
+              
+              // ✅ Logic Update:
+              // রিয়েল আইটেম হলে ব্যাচ আইডি যাবে
+              // ম্যানুয়াল হলে null যাবে (এবং manualItemName এ নাম সেভ হবে)
+              batchId: batchIdToSave, 
+              manualItemName: item.isManual ? item.name : null, 
+              
               quantity: item.quantity,
-              // @ts-ignore: Enum matching is safe here
+              // @ts-ignore: টাইপ মিসম্যাচ এড়ানোর জন্য
               unitType: item.unitType, 
-              totalPrice: item.totalPrice, // Individual item total
+              totalPrice: item.totalPrice, 
               buyerType: "CONSUMER",
-              date: new Date()
-            }
+              date: transactionDate,
+            } as any
           });
       }
     });
@@ -124,13 +149,14 @@ export async function processRetailSale(formData: FormData) {
     // ৩. রিফ্রেশ পাথ
     revalidatePath("/dashboard/retailer/pos");
     revalidatePath("/dashboard/retailer/sales");
+    revalidatePath("/dashboard/retailer/inventory");
     revalidatePath("/dashboard/retailer");
     
-    return { success: true, message: "✅ Sale Successful! All items processed." };
+    return { success: true, message: "✅ Sale Successful! Transaction Recorded." };
 
   } catch (error: any) {
     console.error("POS Transaction Error:", error);
-    // এরর মেসেজটি ফ্রন্টএন্ডে পাঠানো হচ্ছে যাতে ইউজার বুঝতে পারে কোন আইটেমে সমস্যা
-    return { success: false, error: error.message || "Transaction Failed" };
+    // সুন্দর এরর মেসেজ রিটার্ন করা
+    return { success: false, error: error.message || "Transaction Failed. Please try again." };
   }
 }

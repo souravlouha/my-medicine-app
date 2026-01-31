@@ -30,8 +30,8 @@ model User {
 
   // ✅ Operator Management (Boss-Worker Relationship)
   ownerId          String?    
-  owner            User?      @relation("OwnerWorker", fields: [ownerId], references: [id])
-  workers          User[]     @relation("OwnerWorker")
+  owner            User?       @relation("OwnerWorker", fields: [ownerId], references: [id])
+  workers          User[]      @relation("OwnerWorker")
 
   // 🔗 Relations
   products         Product[]     @relation("ProductOwner")
@@ -45,30 +45,30 @@ model User {
   sales            SalesRecord[] @relation("SalesBy")
   
   // 🚚 Supply Chain
-  sentShipments         Shipment[]    @relation("Sender")
-  receivedShipments     Shipment[]    @relation("Receiver")
+  sentShipments        Shipment[]    @relation("Sender")
+  receivedShipments    Shipment[]    @relation("Receiver")
   
   // 🆕 B2B Ordering (Distributor <-> Retailer)
-  placedOrders          Order[]       @relation("PlacedOrders")   
-  receivedOrders        Order[]       @relation("ReceivedOrders") 
+  placedOrders         Order[]        @relation("PlacedOrders")    
+  receivedOrders       Order[]        @relation("ReceivedOrders") 
 
   // 🛒 Retailer Shopping Cart
-  cart                  Cart?
+  cart                 Cart?
 
   // 🏪 Retailer Sales to Consumer (POS)
-  retailSales           RetailSale[]
+  retailSales          RetailSale[]
 
   // 🔔 Alerts & Actions
-  notifications         Notification[] 
-  returnsSent           Return[]       @relation("ReturnSender")
-  returnsReceived       Return[]       @relation("ReturnReceiver")
-  auditLogs             AuditLog[]      
+  notifications        Notification[] 
+  returnsSent          Return[]        @relation("ReturnSender")
+  returnsReceived      Return[]        @relation("ReturnReceiver")
+  auditLogs            AuditLog[]      
 
   // 🔥 Activity Log
-  activityLogs          ActivityLog[]
+  activityLogs         ActivityLog[]
 
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 }
 
 enum Role {
@@ -90,8 +90,8 @@ model Product {
   basePrice        Float?    
   
   name             String    
-  genericName      String?   
-  strength         String?   
+  genericName      String?    
+  strength         String?    
   type             MedicineType 
   
   // ✅ কনভার্সন লজিক (এক পাতায় কয়টি ট্যাবলেট থাকে)
@@ -101,11 +101,11 @@ model Product {
   // ✅ স্ক্যান করার জন্য গ্লোবাল বারকোড
   barcode          String?  
 
-  storageTemp      String?   
+  storageTemp      String?    
   isNarcotic       Boolean  @default(false) 
   
   manufacturerId   String
-  manufacturer     User      @relation("ProductOwner", fields: [manufacturerId], references: [id])
+  manufacturer     User       @relation("ProductOwner", fields: [manufacturerId], references: [id])
   
   batches          Batch[]
   orderItems       OrderItem[] 
@@ -134,13 +134,13 @@ model Batch {
   product          Product  @relation(fields: [productId], references: [id])
   
   manufacturerId   String
-  manufacturer     User      @relation("BatchCreator", fields: [manufacturerId], references: [id])
+  manufacturer     User       @relation("BatchCreator", fields: [manufacturerId], references: [id])
   
   mfgDate          DateTime
   expDate          DateTime 
   
   mrp              Float
-  totalQuantity    Int            
+  totalQuantity    Int             
   
   // 🔗 Tracking
   inventory        Inventory[]
@@ -165,21 +165,21 @@ model Batch {
 model Inventory {
   id               String   @id @default(uuid())
   
-  userId           String   
-  user             User     @relation(fields: [userId], references: [id])
+  userId           String    
+  user             User      @relation(fields: [userId], references: [id])
   
   batchId          String
-  batch            Batch    @relation(fields: [batchId], references: [id])
+  batch            Batch     @relation(fields: [batchId], references: [id])
   
   // ✅ ফুল স্ট্রিপ বা প্যাক স্টক (Full Strips / Full Bottles)
-  currentStock     Int      
+  currentStock     Int       
   
   // ✅ খোলা ট্যাবলেটের স্টক (Loose Tablets)
   // Syrup বা Single Unit Injection হলে এটি সবসময় ০ থাকবে
-  looseStock       Int      @default(0) 
+  looseStock       Int       @default(0) 
   
   // ✅ ডিস্ট্রিবিউটর বা রিটেইলারের সেট করা দাম
-  sellingPrice     Float    @default(0) 
+  sellingPrice     Float     @default(0) 
 
   updatedAt        DateTime @updatedAt
 
@@ -202,15 +202,15 @@ model Cart {
 }
 
 model CartItem {
-  id            String    @id @default(uuid())
-  cartId        String
-  cart          Cart      @relation(fields: [cartId], references: [id])
+  id             String    @id @default(uuid())
+  cartId         String
+  cart           Cart      @relation(fields: [cartId], references: [id])
   
-  inventoryId   String
-  inventory     Inventory @relation(fields: [inventoryId], references: [id])
+  inventoryId    String
+  inventory      Inventory @relation(fields: [inventoryId], references: [id])
   
-  quantity      Int       @default(1)
-  price         Float     
+  quantity       Int       @default(1)
+  price          Float     
 }
 
 // ==========================================
@@ -219,7 +219,7 @@ model CartItem {
 model RetailSale {
   id               String   @id @default(uuid())
   
-  retailerId       String   
+  retailerId       String    
   retailer         User     @relation(fields: [retailerId], references: [id])
   
   inventoryId      String
@@ -228,8 +228,8 @@ model RetailSale {
   // কি বিক্রি হলো? (STRIP, TABLET নাকি UNIT)
   unitType         SaleUnitType 
   
-  quantity         Int      
-  totalPrice       Float    
+  quantity         Int       
+  totalPrice       Float     
   
   customerName     String?  
   customerPhone    String?  
@@ -293,10 +293,10 @@ model Shipment {
   shipmentId       String?  @unique 
   
   manufacturerId   String
-  sender           User      @relation("Sender", fields: [manufacturerId], references: [id])
+  sender           User     @relation("Sender", fields: [manufacturerId], references: [id])
   
   distributorId    String
-  receiver         User      @relation("Receiver", fields: [distributorId], references: [id])
+  receiver         User     @relation("Receiver", fields: [distributorId], references: [id])
   
   items            ShipmentItem[]
   
@@ -338,10 +338,10 @@ model Order {
   orderId          String   @unique 
   
   senderId         String    
-  sender           User      @relation("PlacedOrders", fields: [senderId], references: [id])
+  sender           User     @relation("PlacedOrders", fields: [senderId], references: [id])
   
   receiverId       String    
-  receiver         User      @relation("ReceivedOrders", fields: [receiverId], references: [id])
+  receiver         User     @relation("ReceivedOrders", fields: [receiverId], references: [id])
 
   totalAmount      Float
   status           OrderStatus @default(PENDING)
@@ -379,14 +379,18 @@ model SalesRecord {
   id               String   @id @default(uuid())
   
   sellerId         String    
-  seller           User      @relation("SalesBy", fields: [sellerId], references: [id])
+  seller           User     @relation("SalesBy", fields: [sellerId], references: [id])
   
-  batchId          String
-  batch            Batch     @relation(fields: [batchId], references: [id])
+  // ✅ FIX: ম্যানুয়াল এন্ট্রির জন্য এটি এখন Optional করা হয়েছে
+  batchId          String?
+  batch            Batch?   @relation(fields: [batchId], references: [id])
   
-  quantity         Int            
+  // ✅ NEW FIELD: ম্যানুয়াল আইটেমের নাম সেভ করার জন্য
+  manualItemName   String?
+
+  quantity         Int             
   totalPrice       Float       
-  buyerType        String?        
+  buyerType        String?         
   
   // ✅ CHANGED: Now uses Enum instead of String for consistency
   unitType         SaleUnitType @default(STRIP) 
@@ -444,10 +448,10 @@ model Return {
   id               String   @id @default(uuid())
   
   senderId         String
-  sender           User      @relation("ReturnSender", fields: [senderId], references: [id])
+  sender           User     @relation("ReturnSender", fields: [senderId], references: [id])
   
   receiverId       String
-  receiver         User      @relation("ReturnReceiver", fields: [receiverId], references: [id])
+  receiver         User     @relation("ReturnReceiver", fields: [receiverId], references: [id])
   
   batchId          String    
   quantity         Int
@@ -466,8 +470,8 @@ model ScanHistory {
   unit             Unit     @relation(fields: [unitId], references: [id])
   
   ipAddress        String?
-  location         String?       
-  device           String?       
+  location         String?        
+  device           String?        
   
   scannedAt        DateTime @default(now())
   isSuspicious     Boolean @default(false) 
@@ -542,12 +546,12 @@ model PrintJob {
   batchId          String
   batch            Batch         @relation(fields: [batchId], references: [id])
   
-  operatorId       String?       
+  operatorId       String?        
   operator         User?         @relation("JobOperator", fields: [operatorId], references: [id])
   
-  machineName      String?         
+  machineName      String?          
   
-  targetQuantity   Int           
+  targetQuantity   Int            
   printedQuantity  Int           @default(0) 
   
   status           String        @default("PENDING") 
