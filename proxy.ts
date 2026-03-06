@@ -1,5 +1,11 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
+import type { Session } from "next-auth";
+
+// Extend the session user type to include role
+interface SessionUser extends NonNullable<Session["user"]> {
+  role?: string;
+}
 
 const PUBLIC_PATHS = [
   "/",
@@ -11,12 +17,16 @@ const PUBLIC_PATHS = [
   "/contact",
   "/features",
   "/operator",
-  "/api/auth",
 ];
 
 export default auth((req) => {
   const { nextUrl, auth: session } = req;
   const pathname = nextUrl.pathname;
+
+  // Allow NextAuth API routes (required for authentication to work)
+  if (pathname.startsWith("/api/auth/")) {
+    return NextResponse.next();
+  }
 
   // Allow public paths and static assets
   const isPublicPath =
@@ -37,7 +47,8 @@ export default auth((req) => {
       return NextResponse.redirect(loginUrl);
     }
 
-    const role = ((session.user as any)?.role || "").toUpperCase();
+    const user = session.user as SessionUser;
+    const role = (user?.role || "").toUpperCase();
 
     // Enforce role-based access to dashboard sub-sections
     if (pathname.startsWith("/dashboard/manufacturer") && role !== "MANUFACTURER") {
