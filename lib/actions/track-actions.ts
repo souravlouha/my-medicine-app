@@ -265,7 +265,7 @@ export async function getTrackingHistoryAction(
 //    Verifies QR/UID, checks expiry & recall, logs scan for fraud detection.
 // =========================================================
 
-const SUSPICIOUS_SCAN_THRESHOLD = 10; // scans within 10 minutes from different IPs
+const SUSPICIOUS_SCAN_THRESHOLD = 10; // 10 total scans OR 3+ scans from 3+ distinct IPs within 10 minutes
 
 export async function verifyMedicineAction(
   scannedId: string,

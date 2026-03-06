@@ -235,7 +235,7 @@ export default function TrackResultClient({ id }: { id: string }) {
           <p className="text-slate-400 text-sm mb-6 leading-relaxed">
             This is a wholesale logistics unit (
             {id.startsWith("CARTON") ? "Carton" : "Box"}). Details are
-            accessible only to authorised supply chain partners.
+            accessible only to authorized supply chain partners.
           </p>
           <div className="font-mono text-xs text-slate-500 bg-slate-800 px-3 py-2 rounded-lg break-all mb-6">
             {id}
