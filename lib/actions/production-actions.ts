@@ -93,6 +93,10 @@ export async function verifyOperatorCode(code: string) {
     });
     if (!job) return { success: false, error: "Invalid Access Code" };
     if (job.status === "COMPLETED") return { success: false, error: "Completed" };
+    if (job.status === "CANCELLED") return { success: false, error: "This job has been cancelled." };
+    if (job.accessExpiresAt && new Date() > job.accessExpiresAt) {
+      return { success: false, error: "Access code has expired. Please request a new code from your manager." };
+    }
     return { success: true, job };
   } catch (error) {
     return { success: false, error: "Verification Failed" };

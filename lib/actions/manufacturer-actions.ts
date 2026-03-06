@@ -2,76 +2,124 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth"; 
-import bcrypt from "bcryptjs"; 
+import { auth } from "@/lib/auth";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
+
+// ==========================================
+// Validation Schemas
+// ==========================================
+
+const productSchema = z.object({
+  name: z.string().min(2, "Product name must be at least 2 characters").max(200),
+  genericName: z.string().optional(),
+  type: z.enum(["TABLET", "CAPSULE", "SYRUP", "INJECTION", "CREAM", "DROPS", "SPRAY"] as const),
+  strength: z.string().optional(),
+  storageTemp: z.string().optional(),
+  basePrice: z.coerce.number().min(0, "Price cannot be negative"),
+  tabletsPerStrip: z.coerce.number().int().min(1).max(1000).default(10),
+});
 
 // ==========================================
 // 1. PRODUCT CATALOG ACTIONS
 // ==========================================
 
-// ✅ Create New Product
+// Create New Product
 export async function createProductAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return { success: false, error: "Unauthorized" };
 
+  const parsed = productSchema.safeParse({
+    name: formData.get("name"),
+    genericName: formData.get("genericName"),
+    type: (formData.get("type") as string)?.toUpperCase(),
+    strength: formData.get("strength"),
+    storageTemp: formData.get("storageTemp"),
+    basePrice: formData.get("basePrice"),
+    tabletsPerStrip: formData.get("tabletsPerStrip"),
+  });
+
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
+  }
+
   try {
     const timestamp = Date.now().toString().slice(-6);
-    const randomNum = Math.floor(Math.random() * 99).toString().padStart(2, '0');
+    const randomNum = Math.floor(Math.random() * 99).toString().padStart(2, "0");
     const autoCode = `MED-${timestamp}${randomNum}`;
-    
-    // ট্যাবলেটের সংখ্যা ফর্ম থেকে নেওয়া হচ্ছে (ডিফল্ট ১০)
-    const tabletsPerStrip = parseInt(formData.get("tabletsPerStrip") as string) || 10; 
 
     await prisma.product.create({
       data: {
         productCode: autoCode,
-        name: formData.get("name") as string,
-        genericName: formData.get("genericName") as string,
-        type: (formData.get("type") as string).toUpperCase() as any,
-        strength: formData.get("strength") as string,
-        storageTemp: formData.get("storageTemp") as string,
-        basePrice: parseFloat(formData.get("basePrice") as string) || 0,
+        name: parsed.data.name,
+        genericName: parsed.data.genericName ?? null,
+        type: parsed.data.type as any,
+        strength: parsed.data.strength ?? null,
+        storageTemp: parsed.data.storageTemp ?? null,
+        basePrice: parsed.data.basePrice,
         manufacturerId: userId,
-        tabletsPerStrip: tabletsPerStrip 
+        tabletsPerStrip: parsed.data.tabletsPerStrip,
       }
     });
-    
+
     revalidatePath("/dashboard/manufacturer/catalog");
-    return { success: true, message: "✅ Product added: " + autoCode };
+    return { success: true, message: "Product added: " + autoCode };
   } catch (error) {
     console.error("Create Product Error:", error);
     return { success: false, error: "Failed to create product" };
   }
 }
 
-// ✅ Update Existing Product
+// Update Existing Product
 export async function updateProductAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const productId = formData.get("productId") as string;
+  if (!productId) return { success: false, error: "Product ID is required" };
+
+  const parsed = productSchema.safeParse({
+    name: formData.get("name"),
+    genericName: formData.get("genericName"),
+    type: (formData.get("type") as string)?.toUpperCase(),
+    strength: formData.get("strength"),
+    storageTemp: formData.get("storageTemp"),
+    basePrice: formData.get("basePrice"),
+    tabletsPerStrip: formData.get("tabletsPerStrip"),
+  });
+
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
+  }
 
   try {
-    const tabletsPerStrip = parseInt(formData.get("tabletsPerStrip") as string) || 10;
+    // Verify the product belongs to this manufacturer
+    const existing = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { manufacturerId: true },
+    });
+    if (!existing || existing.manufacturerId !== userId) {
+      return { success: false, error: "Forbidden: Product not found or access denied." };
+    }
 
     await prisma.product.update({
       where: { id: productId },
       data: {
-        name: formData.get("name") as string,
-        genericName: formData.get("genericName") as string,
-        type: formData.get("type") as any,
-        strength: formData.get("strength") as string,
-        storageTemp: formData.get("storageTemp") as string,
-        basePrice: parseFloat(formData.get("basePrice") as string) || 0,
-        tabletsPerStrip: tabletsPerStrip 
+        name: parsed.data.name,
+        genericName: parsed.data.genericName ?? null,
+        type: parsed.data.type as any,
+        strength: parsed.data.strength ?? null,
+        storageTemp: parsed.data.storageTemp ?? null,
+        basePrice: parsed.data.basePrice,
+        tabletsPerStrip: parsed.data.tabletsPerStrip,
       }
     });
     revalidatePath("/dashboard/manufacturer/catalog");
-    return { success: true, message: "✅ Product Updated Successfully!" };
+    return { success: true, message: "Product Updated Successfully!" };
   } catch (error) {
-    console.error("Update Product Error:", error); 
+    console.error("Update Product Error:", error);
     return { success: false, error: "Failed to update product" };
   }
 }

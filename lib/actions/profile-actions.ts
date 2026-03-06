@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { auth } from "@/lib/auth";
 
 export async function updateFullProfileAction(userId: string, data: {
   phone: any;
@@ -9,6 +10,12 @@ export async function updateFullProfileAction(userId: string, data: {
   gstNo: any;
   fullAddress: any;
 }) {
+  // Verify the caller is updating their own profile
+  const session = await auth();
+  if (!session?.user?.id || session.user.id !== userId) {
+    return { success: false, message: "Unauthorized: You can only update your own profile." };
+  }
+
   try {
     // ডাটাবেসে আপডেট করা হচ্ছে
     await prisma.user.update({

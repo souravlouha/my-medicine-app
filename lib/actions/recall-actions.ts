@@ -2,12 +2,12 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { auth } from "@/lib/auth";
 
 export async function recallBatchAction(formData: FormData) {
   // ১. ইউজার অথেন্টিকেশন চেক
-  const cookieStore = await cookies();
-  const userId = cookieStore.get("userId")?.value;
+  const session = await auth();
+  const userId = session?.user?.id;
 
   if (!userId) {
     return { success: false, error: "Unauthorized: You must be logged in." };
@@ -35,6 +35,12 @@ export async function recallBatchAction(formData: FormData) {
 
     if (!batch) {
       return { success: false, error: "Batch not found." };
+    }
+
+    // Authorization: only the batch manufacturer or admin may issue a recall
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (batch.manufacturerId !== userId && user?.role !== "ADMIN") {
+      return { success: false, error: "Forbidden: You are not authorized to recall this batch." };
     }
 
     // ৪. রিকল রেকর্ড তৈরি করা

@@ -62,7 +62,18 @@ export async function addOperator(formData: FormData) {
 
 // ৩. অপারেটর ডিলিট করা
 export async function deleteOperator(operatorId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
   try {
+    // Ensure the operator belongs to the calling user before deleting
+    const operator = await prisma.user.findUnique({
+      where: { id: operatorId },
+      select: { ownerId: true, role: true },
+    });
+    if (!operator || operator.role !== "OPERATOR" || operator.ownerId !== session.user.id) {
+      return { success: false, error: "Forbidden: You are not authorized to delete this operator." };
+    }
     await prisma.user.delete({ where: { id: operatorId } });
     revalidatePath("/dashboard/manufacturer/operators");
     return { success: true };
