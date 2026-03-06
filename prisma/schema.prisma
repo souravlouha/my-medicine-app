@@ -266,6 +266,10 @@ model Unit {
   scans            ScanHistory[]
 
   createdAt        DateTime @default(now())
+
+  @@index([batchId])
+  @@index([parentId])
+  @@index([status])
 }
 
 enum UnitType {
@@ -475,6 +479,9 @@ model ScanHistory {
   
   scannedAt        DateTime @default(now())
   isSuspicious     Boolean @default(false) 
+
+  @@index([unitId])
+  @@index([scannedAt])
 }
 
 // ==========================================
