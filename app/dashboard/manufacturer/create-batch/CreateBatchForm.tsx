@@ -63,89 +63,142 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
     setLoading(false);
   }
 
-  // ✅ FULL HIERARCHY PREVIEW
+  // ✅ FULL HIERARCHY PREVIEW + PRINT VIEW
   if (createdBatch) {
+    const selectedProduct = products.find((p) => p.id === selectedProductId);
+
     return (
       <div className="space-y-8 animate-fade-in">
-        
-        {/* Success Header */}
-        <div className="p-6 bg-green-50 border border-green-200 rounded-2xl text-center">
-           <h2 className="text-2xl font-bold text-green-800">✅ Production Successful!</h2>
-           <p className="mt-2 text-gray-600">Batch <span className="font-mono font-bold bg-white px-2 py-1 rounded border">{createdBatch.no}</span> has been generated.</p>
-           <p className="text-sm font-bold text-green-600 mt-1">Total Output: {totalStrips} Strips | {totalCartons} Cartons</p>
+
+        {/* ── Screen-only: Success header ─────────────────────────────── */}
+        <div className="print:hidden p-6 bg-green-50 border border-green-200 rounded-2xl text-center">
+          <h2 className="text-2xl font-bold text-green-800">✅ Production Successful!</h2>
+          <p className="mt-2 text-gray-600">
+            Batch <span className="font-mono font-bold bg-white px-2 py-1 rounded border">{createdBatch.no}</span> has been generated.
+          </p>
+          <p className="text-sm font-bold text-green-600 mt-1">
+            Total Output: {totalStrips} Strips | {totalCartons} Cartons
+          </p>
         </div>
 
-        {/* 🖨️ PRINT & ACTION BUTTONS */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 no-print">
-            <h3 className="font-bold text-gray-700">QR Hierarchy Preview</h3>
-            <div className="flex gap-4">
-                <button onClick={() => window.print()} className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black flex items-center gap-2 shadow-lg transition">
-                  🖨️ Print Labels
-                </button>
-                <button onClick={() => {setCreatedBatch(null); router.push("/dashboard/manufacturer")}} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition border border-gray-200">
-                   Back to Dashboard
-                </button>
-            </div>
+        {/* ── Screen-only: Action bar ─────────────────────────────────── */}
+        <div className="print:hidden flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="font-bold text-gray-700">QR Hierarchy Preview</h3>
+          <div className="flex gap-4">
+            <button
+              onClick={() => window.print()}
+              className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-black flex items-center gap-2 shadow-lg transition"
+            >
+              🖨️ Print Labels
+            </button>
+            <button
+              onClick={() => { setCreatedBatch(null); router.push("/dashboard/manufacturer"); }}
+              className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition border border-gray-200"
+            >
+              Back to Dashboard
+            </button>
+          </div>
         </div>
-        
-        {/* 🔥 THE FULL HIERARCHY TREE VIEW 🔥 */}
-        <div className="space-y-8 print-area">
-           {Array.from({ length: totalCartons }).map((_, cIndex) => {
-             const cartonId = `CARTON-${createdBatch.no}-${cIndex+1}`;
-             
-             return (
-             <div key={cIndex} className="border-4 border-gray-800 rounded-3xl p-8 bg-white relative break-inside-avoid">
-               
-               <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6">
-                  <div className="bg-white p-2 border border-gray-200 rounded-lg">
-                     <QRCode value={`${baseUrl}/verify/${cartonId}`} size={100} />
+
+        {/* ── Print-only: page title ─────────────────────────────────── */}
+        <div className="hidden print:block text-center mb-4 border-b pb-4">
+          <h1 className="text-lg font-black uppercase tracking-widest text-gray-900">
+            QR Label Sheet
+          </h1>
+          <p className="text-xs text-gray-500 font-mono mt-1">
+            Batch: {createdBatch.no} · Generated: {new Date().toLocaleDateString()}
+          </p>
+        </div>
+
+        {/* ── Hierarchy view (shown on screen + in print) ─────────────── */}
+        <div className="space-y-8">
+          {Array.from({ length: totalCartons }).map((_, cIndex) => {
+            const cartonId = `CARTON-${createdBatch.no}-${cIndex + 1}`;
+
+            return (
+              <div
+                key={cIndex}
+                className="border-4 border-gray-800 rounded-3xl p-8 bg-white break-inside-avoid print:rounded-none print:border-2 print:p-4"
+              >
+                {/* Carton header */}
+                <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6 break-inside-avoid">
+                  <div className="bg-white p-2 border border-gray-200 rounded-lg flex-shrink-0">
+                    <QRCode value={`${baseUrl}/verify/${cartonId}`} size={100} />
                   </div>
                   <div>
-                     <h3 className="text-2xl font-black uppercase text-gray-900">CARTON: {cIndex+1}</h3>
-                     <p className="font-mono text-gray-500 font-bold">{cartonId}</p>
-                     <p className="text-sm text-gray-400 mt-1">Contains {boxesPerCarton} Boxes</p>
+                    <h3 className="text-2xl font-black uppercase text-gray-900">CARTON {cIndex + 1}</h3>
+                    <p className="font-mono text-xs text-gray-600 mt-1 font-bold">{cartonId}</p>
+                    {selectedProduct && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        {selectedProduct.name}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-0.5">Contains {boxesPerCarton} Boxes × {stripsPerBox} Strips</p>
                   </div>
-               </div>
+                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Boxes grid — 2 col on screen, up to 2 col in print */}
+                <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6">
                   {Array.from({ length: boxesPerCarton }).map((_, bIndex) => {
-                    const boxId = `BOX-${createdBatch.no}-${cIndex+1}-${bIndex+1}`;
+                    const boxId = `BOX-${createdBatch.no}-${cIndex + 1}-${bIndex + 1}`;
 
                     return (
-                    <div key={bIndex} className="border-2 border-gray-300 rounded-2xl p-5 bg-gray-50 break-inside-avoid">
-                       
-                       <div className="flex items-center gap-4 mb-4">
-                          <div className="bg-white p-1.5 border border-gray-200 rounded">
-                             <QRCode value={`${baseUrl}/verify/${boxId}`} size={60} />
+                      <div
+                        key={bIndex}
+                        className="border-2 border-gray-300 rounded-2xl p-5 bg-gray-50 break-inside-avoid print:rounded-none print:p-3"
+                      >
+                        {/* Box header */}
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="bg-white p-1.5 border border-gray-200 rounded flex-shrink-0">
+                            <QRCode value={`${baseUrl}/verify/${boxId}`} size={60} />
                           </div>
                           <div>
-                             <p className="text-sm font-black uppercase text-gray-700">BOX: {bIndex+1}</p>
-                             <p className="text-[10px] text-gray-500 font-bold font-mono">{boxId}</p>
-                             <p className="text-[10px] text-gray-400">Contains {stripsPerBox} Strips</p>
+                            <p className="text-sm font-black uppercase text-gray-700">
+                              BOX {bIndex + 1}
+                            </p>
+                            <p className="text-[10px] text-gray-500 font-bold font-mono break-all">{boxId}</p>
+                            <p className="text-[10px] text-gray-400">Contains {stripsPerBox} Strips</p>
                           </div>
-                       </div>
+                        </div>
 
-                       <div className="grid grid-cols-5 gap-3">
+                        {/* Strip grid: 4 col for print labels */}
+                        <div className="grid grid-cols-5 print:grid-cols-4 gap-2 print:gap-1">
                           {Array.from({ length: stripsPerBox }).map((_, sIndex) => {
-                            const stripId = `STRIP-${createdBatch.no}-${cIndex+1}-${bIndex+1}-${sIndex+1}`;
+                            const stripId = `STRIP-${createdBatch.no}-${cIndex + 1}-${bIndex + 1}-${sIndex + 1}`;
 
                             return (
-                            <div key={sIndex} className="flex flex-col items-center bg-white p-2 rounded border border-gray-200 shadow-sm hover:border-blue-400 transition">
-                               <QRCode value={`${baseUrl}/verify/${stripId}`} size={40} />
-                               <span className="text-[8px] font-mono font-bold mt-1 text-gray-400">{sIndex+1}</span>
-                            </div>
-                            )
+                              <div
+                                key={sIndex}
+                                className="flex flex-col items-center bg-white p-2 print:p-1 rounded border border-gray-200 shadow-sm break-inside-avoid hover:border-blue-400 transition"
+                              >
+                                <QRCode value={`${baseUrl}/verify/${stripId}`} size={40} />
+                                {/* Labels under QR — visible on print */}
+                                <div className="w-full text-center mt-1 space-y-0">
+                                  <p className="text-[7px] font-mono font-bold text-gray-500 leading-tight break-all">
+                                    S{sIndex + 1}
+                                  </p>
+                                  <p className="text-[6px] font-mono text-gray-400 leading-tight break-all print:block hidden">
+                                    {createdBatch.no}
+                                  </p>
+                                </div>
+                              </div>
+                            );
                           })}
-                       </div>
+                        </div>
 
-                    </div>
-                    )
+                      </div>
+                    );
                   })}
-               </div>
+                </div>
 
-             </div>
-             )
-           })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Print-only: footer ─────────────────────────────────────── */}
+        <div className="hidden print:block text-center mt-6 pt-4 border-t text-xs text-gray-400">
+          Generated by MedTrace · {selectedProduct?.name ?? ""} · {createdBatch.no}
         </div>
 
       </div>

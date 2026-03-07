@@ -123,3 +123,37 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Print styles for QR label printing ─────────────────────────────────── */
+@media print {
+  /* Remove browser default margins / headers / footers */
+  @page {
+    margin: 10mm;
+  }
+
+  /* Hide everything in the dashboard shell (sidebar, nav, header) */
+  nav,
+  aside,
+  header,
+  footer,
+  [data-sidebar],
+  [role="navigation"],
+  [class*="sidebar"],
+  [class*="Sidebar"],
+  [class*="header"],
+  [class*="Header"] {
+    display: none !important;
+  }
+
+  /* Let the print area fill the page */
+  body,
+  html {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ensure QR codes and labels render in black */
+  svg {
+    color-scheme: light;
+  }
+}
