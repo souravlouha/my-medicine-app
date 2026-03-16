@@ -81,7 +81,39 @@ export async function updateOrderStatusAction(formData: FormData) {
           }
         });
 
-        // ৩. অর্ডার স্ট্যাটাস আপডেট
+        // ৩. ✅ BatchMovement records for supply chain tracking
+        const distUser = await tx.user.findUnique({ where: { id: userId }, select: { name: true } });
+        const retailerUser = await tx.user.findUnique({ where: { id: order.senderId }, select: { name: true } });
+        for (const sItem of shipmentItemsData) {
+          await tx.batchMovement.create({
+            data: {
+              batchId: sItem.batchId,
+              senderId: userId,
+              receiverId: order.senderId,
+              senderName: distUser?.name || "Distributor",
+              receiverName: retailerUser?.name || "Retailer",
+              role: "RETAILER",
+              quantity: sItem.quantity,
+              status: "IN_TRANSIT",
+            },
+          });
+
+          // 🔗 Strip-level tracking: update currentHandlerId
+          const stripsToTransfer = await tx.unit.findMany({
+            where: { batchId: sItem.batchId, type: "STRIP", currentHandlerId: userId },
+            take: sItem.quantity,
+            orderBy: { uid: "asc" },
+            select: { id: true },
+          });
+          if (stripsToTransfer.length > 0) {
+            await tx.unit.updateMany({
+              where: { id: { in: stripsToTransfer.map((s) => s.id) } },
+              data: { currentHandlerId: order.senderId },
+            });
+          }
+        }
+
+        // ৪. অর্ডার স্ট্যাটাস আপডেট
         await tx.order.update({
           where: { id: orderId },
           data: { status: "SHIPPED" }
@@ -96,9 +128,18 @@ export async function updateOrderStatusAction(formData: FormData) {
     // CASE 2: অন্যান্য স্ট্যাটাস (APPROVED, CANCELLED, etc.)
     // ---------------------------------------------------------
     else {
+      const ALLOWED_STATUSES = ["PENDING", "APPROVED", "CANCELLED"];
+      if (!ALLOWED_STATUSES.includes(newStatus)) {
+        return { success: false, error: "Invalid status" };
+      }
+
+      // Verify ownership
+      const order = await prisma.order.findUnique({ where: { id: orderId }, select: { receiverId: true } });
+      if (!order || order.receiverId !== userId) return { success: false, error: "Order not found" };
+
       await prisma.order.update({
         where: { id: orderId },
-        data: { status: newStatus as any } 
+        data: { status: newStatus as "PENDING" | "APPROVED" | "CANCELLED" }
       });
 
       revalidatePath("/dashboard/distributor/orders");
@@ -205,17 +246,25 @@ export async function createDistributorShipmentAction(formData: FormData) {
   const quantity = parseInt(formData.get("quantity") as string);
   const pricePerUnit = parseFloat(formData.get("price") as string);
 
+  if (!retailerId || !inventoryId || isNaN(quantity) || quantity <= 0 || isNaN(pricePerUnit) || pricePerUnit < 0) {
+    return { success: false, error: "Invalid shipment data" };
+  }
+
   try {
-    const inventoryItem = await prisma.inventory.findUnique({
-      where: { id: inventoryId },
-      include: { batch: true }
-    });
-
-    if (!inventoryItem || inventoryItem.currentStock < quantity) {
-      return { success: false, error: "Insufficient stock!" };
-    }
-
     await prisma.$transaction(async (tx) => {
+      // Stock check INSIDE transaction to prevent race conditions
+      const inventoryItem = await tx.inventory.findUnique({
+        where: { id: inventoryId },
+        include: { batch: true }
+      });
+
+      if (!inventoryItem || inventoryItem.userId !== userId) {
+        throw new Error("Inventory not found or access denied");
+      }
+      if (inventoryItem.currentStock < quantity) {
+        throw new Error("Insufficient stock!");
+      }
+
       await tx.inventory.update({
         where: { id: inventoryId },
         data: { currentStock: { decrement: quantity } }
@@ -231,6 +280,36 @@ export async function createDistributorShipmentAction(formData: FormData) {
           items: { create: { batchId: inventoryItem.batchId, quantity, price: pricePerUnit } }
         }
       });
+
+      // ✅ BatchMovement record for supply chain tree  
+      const distUser = await tx.user.findUnique({ where: { id: userId }, select: { name: true } });
+      const retailerUser = await tx.user.findUnique({ where: { id: retailerId }, select: { name: true } });
+      await tx.batchMovement.create({
+        data: {
+          batchId: inventoryItem.batchId,
+          senderId: userId,
+          receiverId: retailerId,
+          senderName: distUser?.name || "Distributor",
+          receiverName: retailerUser?.name || "Retailer",
+          role: "RETAILER",
+          quantity: quantity,
+          status: "IN_TRANSIT",
+        },
+      });
+
+      // 🔗 Strip-level tracking: update currentHandlerId
+      const stripsToTransfer = await tx.unit.findMany({
+        where: { batchId: inventoryItem.batchId, type: "STRIP", currentHandlerId: userId },
+        take: quantity,
+        orderBy: { uid: "asc" },
+        select: { id: true },
+      });
+      if (stripsToTransfer.length > 0) {
+        await tx.unit.updateMany({
+          where: { id: { in: stripsToTransfer.map((s) => s.id) } },
+          data: { currentHandlerId: retailerId },
+        });
+      }
     });
 
     revalidatePath("/dashboard/distributor/inventory");

@@ -1,8 +1,7 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+//layout.tsx
 
-const inter = Inter({ subsets: ["latin"] });
+import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "MedTrace",
@@ -20,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       {/* ✅ suppressHydrationWarning যোগ করা হয়েছে */}
-      <body className={inter.className} suppressHydrationWarning={true}>
+      <body className="font-sans antialiased" suppressHydrationWarning={true}>
         {children}
       </body>
     </html>

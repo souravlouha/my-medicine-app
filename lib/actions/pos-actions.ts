@@ -46,6 +46,13 @@ export async function processRetailSale(formData: FormData) {
   try {
     // ২. ডাটাবেস ট্রানজ্যাকশন শুরু
     await prisma.$transaction(async (tx) => {
+
+      // Seller name fetch inside tx for consistency
+      const seller = await tx.user.findUnique({
+        where: { id: userId },
+        select: { name: true },
+      });
+      const sellerName = seller?.name || "Retailer";
       
       // 🔄 লুপ: প্রতিটি আইটেম প্রসেস করা হবে
       for (const item of cartItems) {
@@ -143,6 +150,32 @@ export async function processRetailSale(formData: FormData) {
               date: transactionDate,
             } as any
           });
+
+          // ৬. BatchMovement তৈরি (Supply Chain Tree এর জন্য) — শুধু রিয়েল আইটেমের জন্য
+          if (!item.isManual && batchIdToSave) {
+            // Parent movement খুঁজে বের করা (Retailer-এর কাছে মালটি কোথা থেকে এসেছিল?)
+            const parentMovement = await tx.batchMovement.findFirst({
+              where: {
+                batchId: batchIdToSave,
+                receiverId: userId,
+              },
+              orderBy: { createdAt: "desc" },
+            });
+
+            await tx.batchMovement.create({
+              data: {
+                batchId: batchIdToSave,
+                senderId: userId,
+                receiverId: null, // Consumer-এর নির্দিষ্ট ID নেই
+                senderName: sellerName,
+                receiverName: "End Consumer",
+                role: "CONSUMER",
+                quantity: item.quantity,
+                status: "SOLD_TO_CONSUMER",
+                parentId: parentMovement ? parentMovement.id : null,
+              },
+            });
+          }
       }
     });
 

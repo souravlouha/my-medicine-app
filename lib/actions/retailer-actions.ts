@@ -7,29 +7,38 @@ import { auth } from "@/lib/auth"; // ✅ Auth ইম্পোর্ট নি�
 
 // 1. CREATE ORDER
 export async function createOrderAction(formData: FormData) {
-  const session = await auth(); // ✅ FIX: কুকির বদলে সেশন
+  const session = await auth();
   const userId = session?.user?.id;
   
-  if (!userId) throw new Error("User not authenticated");
+  if (!userId) return { success: false, error: "User not authenticated" };
 
   const distributorId = formData.get("distributorId") as string;
   const productId = formData.get("productId") as string;
   const price = parseFloat(formData.get("price") as string);
   const quantity = parseInt(formData.get("quantity") as string);
 
-  const orderId = `ORD-${Date.now().toString().slice(-6)}`;
+  if (!distributorId || !productId || isNaN(price) || isNaN(quantity) || quantity <= 0) {
+    return { success: false, error: "Invalid order data" };
+  }
 
-  await prisma.order.create({
-    data: {
-      orderId, 
-      senderId: userId, 
-      receiverId: distributorId, 
-      totalAmount: price * quantity, 
-      status: "PENDING",
-      items: { create: { productId, quantity, price } }
-    }
-  });
-  redirect("/dashboard/retailer/orders");
+  try {
+    const orderId = `ORD-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+
+    await prisma.order.create({
+      data: {
+        orderId, 
+        senderId: userId, 
+        receiverId: distributorId, 
+        totalAmount: price * quantity, 
+        status: "PENDING",
+        items: { create: { productId, quantity, price } }
+      }
+    });
+    redirect("/dashboard/retailer/orders");
+  } catch (error: any) {
+    if (error?.digest?.includes("NEXT_REDIRECT")) throw error;
+    return { success: false, error: error.message || "Failed to create order" };
+  }
 }
 
 // 2. RECEIVE ORDER (Legacy - Keep as is)
@@ -44,7 +53,7 @@ export async function receiveShipmentAction(formData: FormData) {
   
   if (!userId) {
       console.error("Unauthorized: No User ID found");
-      return;
+      return { success: false, error: "Unauthorized" };
   }
 
   const shipmentId = formData.get("shipmentId") as string;
@@ -107,9 +116,11 @@ export async function receiveShipmentAction(formData: FormData) {
 
     revalidatePath("/dashboard/retailer/incoming");
     revalidatePath("/dashboard/retailer/inventory");
+    return { success: true, message: "Shipment received successfully!" };
     
-  } catch (error) {
+  } catch (error: any) {
     console.error("Receive Error:", error);
+    return { success: false, error: error.message || "Failed to receive shipment" };
   }
 }
 
@@ -139,23 +150,40 @@ export async function addToCartAction(formData: FormData) {
 
 // 5. UPDATE CART QTY
 export async function updateCartItemQuantityAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
   const itemId = formData.get("itemId") as string;
   const actionType = formData.get("type") as "plus" | "minus";
 
-  const cartItem = await prisma.cartItem.findUnique({ where: { id: itemId } });
-  if (!cartItem) return;
+  const cartItem = await prisma.cartItem.findUnique({
+    where: { id: itemId },
+    include: { cart: true },
+  });
+  if (!cartItem || cartItem.cart.userId !== session.user.id) return { success: false, error: "Not found" };
 
   if (actionType === "plus") {
-    await prisma.cartItem.update({ where: { id: itemId }, data: { quantity: cartItem.quantity + 1 } });
+    await prisma.cartItem.update({ where: { id: itemId }, data: { quantity: { increment: 1 } } });
   } else if (actionType === "minus" && cartItem.quantity > 1) {
-    await prisma.cartItem.update({ where: { id: itemId }, data: { quantity: cartItem.quantity - 1 } });
+    await prisma.cartItem.update({ where: { id: itemId }, data: { quantity: { decrement: 1 } } });
   }
   revalidatePath("/dashboard/retailer/cart");
 }
 
 // 6. REMOVE CART
 export async function removeFromCartAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
   const itemId = formData.get("itemId") as string;
+  
+  // Ownership check
+  const cartItem = await prisma.cartItem.findUnique({
+    where: { id: itemId },
+    include: { cart: true },
+  });
+  if (!cartItem || cartItem.cart.userId !== session.user.id) return { success: false, error: "Not found" };
+
   await prisma.cartItem.delete({ where: { id: itemId } });
   revalidatePath("/dashboard/retailer/cart");
 }
@@ -164,14 +192,14 @@ export async function removeFromCartAction(formData: FormData) {
 export async function placeOrderAction(formData: FormData) {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId) return;
+  if (!userId) return { success: false, error: "Unauthorized" };
 
   const cart = await prisma.cart.findUnique({
     where: { userId },
     include: { items: { include: { inventory: true } } }
   });
 
-  if (!cart || cart.items.length === 0) return;
+  if (!cart || cart.items.length === 0) return { success: false, error: "Cart is empty" };
 
   const ordersMap = new Map();
   for (const item of cart.items) {

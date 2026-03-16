@@ -11,7 +11,8 @@ import {
   Truck, Box, BarChart3, Globe, Lock, FileText, Database, Menu,
   MoreHorizontal, Phone, History, Home, TrendingUp, TrendingDown,
   Loader2, Server, Layers, Award, Star, HeartPulse, Stethoscope, 
-  ShieldAlert, Fingerprint, Globe2, Leaf, Factory, Lightbulb, Siren
+  ShieldAlert, Fingerprint, Globe2, Leaf, Factory, Lightbulb, Siren,
+  Sparkles, Shield, Heart, Clock, Eye, Pill, BadgeCheck, CircleDot
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -24,6 +25,8 @@ export default function LandingPage() {
   const [aiResult, setAiResult] = useState<any>(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [totalScans, setTotalScans] = useState(14203);
+  const [showScanner, setShowScanner] = useState(false);
 
   // --- 🔴 LIVE STATS STATE ---
   const [liveStats, setLiveStats] = useState({
@@ -51,9 +54,14 @@ export default function LandingPage() {
         setCurrentTip((prev) => (prev + 1) % healthTips.length);
     }, 4000);
 
+    const scanInterval = setInterval(() => {
+        setTotalScans((prev) => prev + Math.floor(Math.random() * 3) + 1);
+    }, 2500);
+
     return () => {
         window.removeEventListener("scroll", handleScroll);
         clearInterval(tipInterval);
+        clearInterval(scanInterval);
     };
   }, []);
 
@@ -174,263 +182,410 @@ export default function LandingPage() {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-10px); }
         }
-        /* ✅ Flip Animation for Mobile Logo */
-        @keyframes flip {
-          0%, 80% { transform: rotateY(0); } 
-          100% { transform: rotateY(360deg); }
+        @keyframes slide-up {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slide-in-right {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes pulse-soft {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        @keyframes ripple {
+          0% { transform: scale(0.8); opacity: 1; }
+          100% { transform: scale(2.4); opacity: 0; }
+        }
+        @keyframes fade-in {
+          0% { opacity: 0; transform: translateY(4px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fade-in-up {
+          0% { opacity: 0; transform: translateY(10px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes progress-fill {
+          from { width: 0%; }
+          to { width: 98%; }
+        }
+        @keyframes ticker {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
         }
 
         .animate-scroll { display: flex; width: max-content; animation: scroll 80s linear infinite; }
         .animate-scroll-reverse { display: flex; width: max-content; animation: scroll-reverse 30s linear infinite; }
         .animate-float { animation: float 6s ease-in-out infinite; }
-        .animate-flip { animation: flip 5s ease-in-out infinite; transform-style: preserve-3d; }
+        .animate-slide-up { animation: slide-up 0.5s ease-out both; }
+        .anim-d1 { animation: slide-up 0.5s ease-out 0.08s both; }
+        .anim-d2 { animation: slide-up 0.5s ease-out 0.16s both; }
+        .anim-d3 { animation: slide-up 0.5s ease-out 0.24s both; }
+        .anim-d4 { animation: slide-up 0.5s ease-out 0.32s both; }
+        .anim-d5 { animation: slide-up 0.5s ease-out 0.4s both; }
+        .animate-slide-in-right { animation: slide-in-right 0.4s ease-out both; }
+        .animate-pulse-soft { animation: pulse-soft 2.5s ease-in-out infinite; }
+        .animate-ripple { animation: ripple 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+        .animate-fade-text { animation: fade-in 0.5s ease-out forwards; }
+        .animate-fade-in-up { animation: fade-in-up 0.5s ease-out forwards; }
+        .animate-ticker { display: flex; width: max-content; animation: ticker 25s linear infinite; }
+        .animate-progress { animation: progress-fill 2s ease-out forwards; }
         
         .hover\:pause:hover { animation-play-state: paused; }
-        
-        /* Fade animation for tip text */
-        @keyframes fade-in {
-            0% { opacity: 0; transform: translateY(5px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-text { animation: fade-in 0.5s ease-out forwards; }
-
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
 
-      {/* --------------------------------------------------------------------------------
-          📱 MOBILE VIEW: CONSUMER APP
-          -------------------------------------------------------------------------------- */}
-      <div className="md:hidden bg-[#F8FAFC] min-h-screen pb-32 relative overflow-hidden">
-          
-          {/* -- Background Gradient -- */}
-          <div className="absolute top-0 left-0 w-full h-[350px] bg-gradient-to-b from-blue-700 via-indigo-600 to-[#F8FAFC] rounded-b-[3rem] z-0 shadow-xl"></div>
-          
-          {/* -- Top Floating Header (✅ Mobile Island Animation Added) -- */}
-          <div className="fixed top-4 left-0 right-0 z-50 flex justify-center">
-             <div className={`transition-all duration-500 ease-in-out flex justify-between items-center px-5 backdrop-blur-md rounded-full border shadow-xl 
-                ${scrolled 
-                  ? 'w-[90%] py-2 bg-white/95 border-slate-200'  // Scrolled state: Smaller, more distinct
-                  : 'w-[95%] py-3 bg-white/90 border-white/50'   // Default state: Wider, lighter
-                }`}>
-                 
-                 <div className="flex items-center gap-3">
-                     {/* ✅ MOBILE LOGO: Bigger, Circular & Animated */}
-                     <div className="bg-white rounded-full p-1 shadow-md animate-flip border-2 border-white">
-                        <Image 
-                           src="/medtrace-logo.png" 
-                           alt="Logo" 
-                           width={56} 
-                           height={56} 
-                           className="h-14 w-14 object-contain rounded-full" 
-                        />
-                     </div>
-                     <span className="font-bold text-slate-800 text-xl tracking-tight">MedTrace</span>
-                 </div>
-                 
-                 <div className="flex items-center gap-3">
-                     <div className="bg-slate-100 p-2 rounded-full text-slate-600 relative cursor-pointer hover:bg-slate-200 transition">
-                         <Bell size={18}/>
-                         <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full border border-white animate-pulse"></span>
-                     </div>
-                     <div className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-slate-500">
-                         <User size={18}/>
-                     </div>
-                 </div>
-             </div>
-          </div>
+      {/* ─── 📱 MOBILE ─── */}
+      <div className="md:hidden min-h-screen bg-white pb-20">
 
-          {/* -- Mobile Hero Content -- */}
-          <div className="relative z-10 px-6 pt-28 pb-4 text-white">
-             {/* ... Hero content remains same ... */}
-             <div className="flex justify-between items-end mb-6">
-                 <div>
-                     <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Stay Safe</p>
-                     <h1 className="text-3xl font-black leading-tight">
-                        Verify Medicine <br/> Instantly
-                     </h1>
-                 </div>
-             </div>
-             
-             {/* Big Action Card */}
-             <Link href="/track">
-                <div className="bg-white text-slate-900 p-6 rounded-[2rem] shadow-2xl relative overflow-hidden group active:scale-[0.98] transition duration-200">
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full blur-[40px] -translate-y-1/2 translate-x-1/2"></div>
-                   <div className="relative z-10 flex items-center justify-between">
-                       <div>
-                          <div className="flex items-center gap-2 mb-2">
-                             <div className="bg-blue-600 text-white p-2 rounded-xl"><QrCode size={24}/></div>
-                             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-wider">AI Powered</span>
-                          </div>
-                          <p className="font-bold text-xl">Tap to Scan</p>
-                          <p className="text-slate-400 text-xs mt-1">Check authenticity instantly</p>
-                       </div>
-                       <div className="h-14 w-14 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg animate-pulse">
-                          <ScanLine size={24}/>
-                       </div>
-                   </div>
-                </div>
-             </Link>
-
-             {/* ✅ NEW: DYNAMIC & COLORFUL Daily Health Tip */}
-             <div className="mt-6 bg-gradient-to-r from-rose-500 via-pink-500 to-orange-500 p-4 rounded-2xl flex items-center gap-4 shadow-xl shadow-pink-500/30 transform hover:scale-105 transition duration-300 ring-2 ring-white/20">
-                 <div className="bg-white p-2.5 rounded-full text-pink-600 shadow-md animate-bounce"><Lightbulb size={24}/></div>
-                 <div className="flex-1">
-                     <p className="text-[10px] font-black text-white uppercase tracking-wider mb-0.5 opacity-90">Daily Health Tip</p>
-                     <p key={currentTip} className="text-sm font-bold text-white leading-snug drop-shadow-sm animate-fade-text">
-                         {healthTips[currentTip]}
-                     </p>
-                 </div>
-             </div>
-          </div>
-
-          {/* -- AI Search -- */}
-          <div className="px-6 mb-6 relative z-10">
-             <div className="bg-white p-2 rounded-[1.5rem] shadow-lg border border-slate-100 flex items-center">
-                <div className="pl-4 text-slate-400"><Search size={20}/></div>
-                <input 
-                   type="text" 
-                   placeholder="Check medicine name..." 
-                   className="w-full p-3 bg-transparent outline-none text-sm font-medium text-slate-700 placeholder:text-slate-400"
-                   value={query}
-                   onChange={(e) => setQuery(e.target.value)}
-                   onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
-                />
-                <button onClick={handleSearch} className="bg-slate-900 p-3 rounded-xl text-white shadow-lg active:scale-90 transition">
-                   {searching ? <Activity size={20} className="animate-spin"/> : <ArrowRight size={20}/>}
-                </button>
-             </div>
-             {aiResult && (
-                <div className="mt-4 bg-white p-4 rounded-[1.5rem] border-l-4 border-emerald-500 shadow-sm flex items-center gap-4 animate-fade-in-up">
-                   <div className="bg-emerald-100 p-2.5 rounded-full text-emerald-600"><CheckCircle2 size={20}/></div>
-                   <div>
-                       <h4 className="font-bold text-slate-900 text-sm">{aiResult.name}</h4>
-                       <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">{aiResult.status}</p>
-                   </div>
-                </div>
-             )}
-          </div>
-
-          {/* -- ✅ Quick Actions Grid -- */}
-          <div className="px-6 relative z-10">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-slate-900 text-sm tracking-wide">Quick Services</h3>
-                <MoreHorizontal size={20} className="text-slate-400"/>
-             </div>
-             <div className="grid grid-cols-4 gap-3 mb-8">
-                <Link href="/features/pharmacy-locator" className="col-span-2">
-                   <div className="bg-blue-600 text-white p-4 rounded-[1.5rem] shadow-lg shadow-blue-500/20 active:scale-95 transition cursor-pointer flex flex-col justify-between h-36 relative overflow-hidden">
-                       <div className="relative z-10">
-                           <MapPin size={24} className="opacity-80 mb-2"/>
-                           <div>
-                               <p className="font-bold text-sm">Pharmacy</p>
-                               <p className="text-[10px] opacity-70">Locator</p>
-                           </div>
-                       </div>
-                       <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-white/20 rounded-full blur-xl"></div>
-                   </div>
-                </Link>
-
-                <div className="col-span-2 grid grid-rows-2 gap-3 h-36">
-                    
-                    {/* ✅ FIX: Report Fake Button Link Added */}
-                    <Link href="/features/report">
-                        <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition h-full cursor-pointer hover:shadow-md">
-                           <div className="bg-red-100 text-red-500 p-2 rounded-full"><AlertTriangle size={16}/></div>
-                           <span className="text-xs font-bold text-slate-700">Report Fake</span>
-                        </div>
-                    </Link>
-
-                    <div className="bg-white p-3 rounded-[1.2rem] shadow-sm border border-slate-100 flex items-center gap-3 active:scale-95 transition">
-                       <div className="bg-emerald-100 text-emerald-500 p-2 rounded-full"><Award size={16}/></div>
-                       <div>
-                           <span className="text-[10px] text-slate-400 block uppercase font-bold">Safety Score</span>
-                           <span className="text-xs font-black text-slate-800">98/100</span>
-                       </div>
-                    </div>
-                </div>
-             </div>
-          </div>
-
-          {/* -- Live Network Activity -- */}
-          <div className="px-6 mb-24">
-             <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold text-slate-900 text-sm">Live Network Activity</h3>
-                <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-full border border-slate-100 shadow-sm">
-                    <span className="relative flex h-2 w-2">
-                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-500">Real-time</span>
-                </div>
-             </div>
-
-             <div className="grid grid-cols-2 gap-3 mb-4">
-                 <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl flex flex-col items-center justify-center text-center">
-                     <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Genuine Scans</p>
-                     <p className="text-xl font-black text-slate-900 mt-1">{liveStats.genuine.toLocaleString()}</p>
-                 </div>
-                 <div className="bg-red-50 border border-red-100 p-3 rounded-2xl flex flex-col items-center justify-center text-center">
-                     <p className="text-[10px] font-bold text-red-600 uppercase tracking-wide">Fakes Blocked</p>
-                     <p className="text-xl font-black text-slate-900 mt-1">{liveStats.fake.toLocaleString()}</p>
-                 </div>
-             </div>
-             
-             <div className="space-y-3">
-                {mobileActivities.map((item) => (
-                   <div key={item.id} className={`bg-white p-3 rounded-[1.2rem] border shadow-sm flex justify-between items-center transition-all duration-300 ${item.status === 'Fake Alert' ? 'border-red-100 border-l-4 border-l-red-500' : 'border-slate-100 border-l-4 border-l-emerald-500'}`}>
-                       <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.status === 'Verified' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                             {item.status === 'Verified' ? <CheckCircle2 size={18}/> : <AlertTriangle size={18}/>}
-                          </div>
-                          <div>
-                             <p className="font-bold text-sm text-slate-800 leading-tight">{item.drug}</p>
-                             <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5"><MapPin size={8}/> {item.location}</p>
-                          </div>
-                       </div>
-                       <div className="text-right">
-                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${item.status === 'Verified' ? 'text-emerald-700 bg-emerald-50' : 'text-red-700 bg-red-50'}`}>
-                             {item.status === 'Verified' ? 'Authentic' : 'Fake'}
-                          </span>
-                          <p className="text-[9px] text-slate-400 mt-1 font-mono">{item.time}</p>
-                       </div>
-                   </div>
-                ))}
-             </div>
-          </div>
-
-          {/* -- Toast -- */}
-          {showToast && (
-             <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-md text-white px-5 py-3 rounded-full text-xs font-bold shadow-xl z-[60] animate-fade-in-down flex items-center gap-2 border border-slate-700 w-max">
-                <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                {toastMessage}
-             </div>
-          )}
-
-          {/* -- Mobile Bottom Nav -- */}
-          <div className="fixed bottom-6 left-6 right-6 z-50">
-              <div className="bg-white/90 backdrop-blur-xl border border-white/50 p-2 rounded-[2rem] shadow-2xl shadow-slate-200 flex justify-between items-center px-6">
-                 <div className="flex flex-col items-center text-blue-600 gap-1 cursor-pointer">
-                    <Home size={22}/>
-                 </div>
-                 <div className="flex flex-col items-center text-slate-400 gap-1 cursor-pointer hover:text-slate-600 transition">
-                    <Search size={22}/>
-                 </div>
-                 <div className="-mt-8">
-                    <Link href="/track">
-                       <div className="bg-slate-900 text-white p-4 rounded-full shadow-xl shadow-slate-900/30 active:scale-95 transition border-4 border-[#F8FAFC]">
-                          <ScanLine size={24}/>
-                       </div>
-                    </Link>
-                 </div>
-                 <div className="flex flex-col items-center text-slate-400 gap-1 cursor-pointer hover:text-slate-600 transition">
-                    <History size={22}/>
-                 </div>
-                 <div className="flex flex-col items-center text-slate-400 gap-1 cursor-pointer hover:text-slate-600 transition">
-                    <User size={22}/>
-                 </div>
+        {/* ▸ Header */}
+        <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-xl shadow-[0_1px_0_rgba(0,0,0,0.04)]' : 'bg-white'}`}>
+          <div className="flex justify-between items-center px-5 h-14">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                <Image src="/medtrace-logo.png" alt="MedTrace" width={22} height={22} className="h-[22px] w-[22px] object-contain"/>
               </div>
+              <div>
+                <span className="font-bold text-[15px] text-slate-900 leading-none block">MedTrace</span>
+                <span className="text-[10px] text-emerald-600 font-medium">Verified Platform</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="relative w-9 h-9 rounded-2xl bg-slate-50 flex items-center justify-center">
+                <Bell size={16} className="text-slate-400"/>
+                <span className="absolute top-2 right-2 w-[5px] h-[5px] bg-red-500 rounded-full"></span>
+              </div>
+              <Link href="/login">
+                <div className="w-9 h-9 rounded-2xl bg-slate-900 flex items-center justify-center">
+                  <User size={15} className="text-white"/>
+                </div>
+              </Link>
+            </div>
           </div>
+        </div>
+
+        {/* ▸ Greeting + Hero Banner */}
+        <div className="pt-[68px] px-5 animate-slide-up">
+          <p className="text-slate-400 text-[14px] mb-1">Welcome to MedTrace 👋</p>
+          <h1 className="text-[26px] font-extrabold text-slate-900 leading-[1.15] tracking-tight">
+            Verify Medicine,<br/>Stay <span className="text-emerald-600">Safe</span>
+          </h1>
+        </div>
+
+        {/* ▸ Promo Banner Card */}
+        <div className="px-5 mt-5 anim-d1">
+          <Link href="/track">
+            <div className="bg-emerald-50 rounded-3xl p-5 relative overflow-hidden active:scale-[0.98] transition-transform">
+              <div className="absolute -right-4 -bottom-4 w-28 h-28 bg-emerald-100 rounded-full opacity-60"></div>
+              <div className="absolute right-5 bottom-4 opacity-20">
+                <ShieldCheck size={56} className="text-emerald-600"/>
+              </div>
+              <div className="relative z-10">
+                <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg mb-3 uppercase tracking-wider">AI-Powered</span>
+                <h2 className="text-slate-900 font-bold text-[18px] leading-snug mb-1">Scan & Verify<br/>Any Medicine</h2>
+                <p className="text-emerald-700/60 text-[12px]">Instant blockchain verification</p>
+                <div className="mt-4 inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-[13px] font-semibold">
+                  <ScanLine size={16}/> Start Scanning
+                </div>
+              </div>
+            </div>
+          </Link>
+        </div>
+
+        {/* ▸ Search */}
+        <div className="px-5 mt-5 anim-d1">
+          <div className="flex items-center gap-2.5 bg-slate-50 rounded-2xl px-4 py-1">
+            <Search size={17} className="text-slate-300 shrink-0"/>
+            <input 
+              type="text" 
+              placeholder="Search here..." 
+              className="flex-1 py-3 bg-transparent outline-none text-[14px] text-slate-800 placeholder:text-slate-300"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch(e)}
+            />
+            <button onClick={handleSearch} className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center active:scale-90 transition shrink-0">
+              {searching ? <Loader2 size={15} className="animate-spin"/> : <ArrowRight size={15}/>}
+            </button>
+          </div>
+          {aiResult && (
+            <div className="mt-3 flex items-center gap-3 bg-white border border-emerald-100 px-4 py-3.5 rounded-2xl animate-slide-up">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={18} className="text-emerald-500"/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-slate-800 text-[13px]">{aiResult.name}</p>
+                <p className="text-[11px] text-emerald-600">{aiResult.status} · {aiResult.desc}</p>
+              </div>
+              <ChevronRight size={16} className="text-slate-300 shrink-0"/>
+            </div>
+          )}
+        </div>
+
+        {/* ▸ Popular Services */}
+        <div className="px-5 mt-7 anim-d2">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-[16px] font-bold text-slate-900">Popular Services</h2>
+            <span className="text-[12px] text-emerald-600 font-medium">Explore all</span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+            {[
+              { href: "/track", icon: QrCode, label: "Verify Medicine" },
+              { href: "/features/pharmacy-locator", icon: MapPin, label: "Pharmacy" },
+              { href: "/features/report", icon: AlertTriangle, label: "Report Fake" },
+              { href: "/track", icon: Shield, label: "Track Batch" },
+            ].map((s, i) => (
+              <Link href={s.href} key={i}>
+                <div className="flex flex-col items-center gap-2 min-w-[76px] active:scale-95 transition">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center">
+                    <s.icon size={22} className="text-slate-600" strokeWidth={1.5}/>
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-500 text-center leading-tight">{s.label}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* ▸ Stats Card */}
+        <div className="px-5 mt-7 anim-d2">
+          <div className="bg-slate-900 rounded-3xl p-5 flex items-center justify-between">
+            <div className="text-center flex-1">
+              <p className="text-white font-bold text-[18px] leading-none">{liveStats.genuine.toLocaleString()}</p>
+              <p className="text-slate-400 text-[10px] mt-1 font-medium">Verified</p>
+            </div>
+            <div className="w-px h-10 bg-slate-700"></div>
+            <div className="text-center flex-1">
+              <p className="text-white font-bold text-[18px] leading-none">{liveStats.fake.toLocaleString()}</p>
+              <p className="text-slate-400 text-[10px] mt-1 font-medium">Blocked</p>
+            </div>
+            <div className="w-px h-10 bg-slate-700"></div>
+            <div className="text-center flex-1">
+              <p className="text-white font-bold text-[18px] leading-none">99.9%</p>
+              <p className="text-slate-400 text-[10px] mt-1 font-medium">Accuracy</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ▸ Live Activity */}
+        <div className="px-5 mt-7 anim-d3">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-[16px] font-bold text-slate-900">Live Activity</h2>
+            <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-full">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+              </span>
+              <span className="text-[10px] text-emerald-700 font-semibold">Live</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {mobileActivities.slice(0, 3).map((item, idx) => (
+              <div 
+                key={item.id}
+                className={`flex items-center gap-3 p-3.5 rounded-2xl transition-all duration-300
+                  ${item.status === 'Fake Alert' ? 'bg-red-50' : 'bg-slate-50'}
+                  ${idx === 0 ? 'animate-slide-in-right' : ''}
+                `}
+              >
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                  item.status === 'Verified' ? 'bg-emerald-100' : 'bg-red-100'
+                }`}>
+                  {item.status === 'Verified' 
+                    ? <CheckCircle2 size={18} className="text-emerald-600"/> 
+                    : <AlertTriangle size={18} className="text-red-500"/>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-[13px] text-slate-800 truncate">{item.drug}</p>
+                  <p className="text-[11px] text-slate-400">{item.location} · {item.time}</p>
+                </div>
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${
+                  item.status === 'Verified' ? 'text-emerald-700 bg-emerald-100' : 'text-red-600 bg-red-100'
+                }`}>
+                  {item.status === 'Verified' ? 'Safe' : 'Fake'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ▸ How It Works */}
+        <div className="px-5 mt-8 anim-d3">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-[16px] font-bold text-slate-900">How It Works</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+            {[
+              { step: "01", title: "Scan Code", desc: "Point camera at QR code on medicine", icon: QrCode, bg: "bg-blue-50", color: "text-blue-600" },
+              { step: "02", title: "AI Verifies", desc: "Blockchain verification in real time", icon: Shield, bg: "bg-indigo-50", color: "text-indigo-600" },
+              { step: "03", title: "Get Result", desc: "Instant report with batch details", icon: CheckCircle2, bg: "bg-emerald-50", color: "text-emerald-600" },
+            ].map((s, i) => (
+              <div key={i} className="min-w-[160px] bg-white border border-slate-100 rounded-3xl p-4 flex-shrink-0">
+                <div className={`w-11 h-11 ${s.bg} rounded-2xl flex items-center justify-center mb-3`}>
+                  <s.icon size={20} className={s.color}/>
+                </div>
+                <p className="font-bold text-[13px] text-slate-900 mb-1">{s.title}</p>
+                <p className="text-[11px] text-slate-400 leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ▸ Health Tip Card */}
+        <div className="px-5 mt-7 anim-d4">
+          <div className="bg-amber-50 rounded-3xl px-5 py-4">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                <Lightbulb size={16} className="text-amber-600"/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">Health Tip</p>
+                <p key={currentTip} className="text-[13px] text-amber-900/70 leading-relaxed font-medium animate-fade-text">
+                  {healthTips[currentTip]}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-1 mt-3 ml-12">
+              {healthTips.map((_, i) => (
+                <div key={i} className={`h-[3px] rounded-full transition-all duration-300 ${i === currentTip ? 'w-5 bg-amber-500' : 'w-1.5 bg-amber-200'}`}/>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ▸ Trust Features */}
+        <div className="px-5 mt-7 anim-d4">
+          <h2 className="text-[16px] font-bold text-slate-900 mb-3">Why MedTrace?</h2>
+          <div className="space-y-2.5">
+            {[
+              { icon: Fingerprint, title: "Blockchain Verified", desc: "Tamper-proof record for every medicine", color: "text-blue-600", bg: "bg-blue-50" },
+              { icon: Zap, title: "Under 2 Seconds", desc: "Lightning-fast verification results", color: "text-amber-600", bg: "bg-amber-50" },
+              { icon: Globe2, title: "50M+ Products", desc: "Global verification network", color: "text-indigo-600", bg: "bg-indigo-50" },
+            ].map((f, i) => (
+              <div key={i} className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-slate-50">
+                <div className={`${f.bg} w-11 h-11 rounded-2xl flex items-center justify-center shrink-0`}>
+                  <f.icon size={18} className={f.color}/>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-slate-900 font-semibold text-[13px]">{f.title}</p>
+                  <p className="text-slate-400 text-[11px] mt-0.5">{f.desc}</p>
+                </div>
+                <ChevronRight size={16} className="text-slate-300 shrink-0"/>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ▸ Testimonial Card */}
+        <div className="px-5 mt-7 anim-d5">
+          <div className="bg-white border border-slate-100 rounded-3xl p-5">
+            <div className="flex items-center gap-3 mb-3.5">
+              <div className="w-11 h-11 bg-emerald-600 rounded-2xl flex items-center justify-center text-white font-bold text-[14px]">
+                {testimonials[0].name.charAt(0)}
+              </div>
+              <div className="flex-1">
+                <p className="text-slate-900 font-bold text-[14px]">{testimonials[0].name}</p>
+                <p className="text-slate-400 text-[11px]">{testimonials[0].role}</p>
+              </div>
+              <div className="flex items-center gap-0.5 bg-amber-50 px-2 py-1 rounded-lg">
+                <Star size={11} className="text-amber-400 fill-amber-400"/>
+                <span className="text-[11px] font-bold text-amber-700">4.9</span>
+              </div>
+            </div>
+            <p className="text-slate-500 text-[13px] leading-relaxed">
+              "{testimonials[0].quote.slice(0, 140)}..."
+            </p>
+          </div>
+        </div>
+
+        {/* ▸ Partners */}
+        <div className="px-5 mt-7 anim-d5">
+          <p className="text-[11px] text-slate-300 font-semibold uppercase tracking-wider mb-3">Trusted Partners</p>
+          <div className="flex gap-3 overflow-x-auto no-scrollbar">
+            {partners.slice(0, 6).map((p, i) => (
+              <div key={i} className="flex items-center gap-1.5 bg-slate-50 px-3.5 py-2 rounded-xl whitespace-nowrap shrink-0">
+                <Building2 size={13} className="text-slate-300"/>
+                <span className="text-[11px] font-medium text-slate-500">{p}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ▸ CTA */}
+        <div className="px-5 mt-10 mb-6 anim-d5">
+          <div className="text-center">
+            <h2 className="text-[20px] font-extrabold text-slate-900 mb-2">Get Started Today</h2>
+            <p className="text-slate-400 text-[13px] mb-5 leading-relaxed">
+              It only takes one scan to protect yourself<br/>and your family.
+            </p>
+            <Link href="/track">
+              <button className="w-full bg-slate-900 text-white py-4 rounded-2xl font-semibold text-[15px] active:scale-[0.98] transition inline-flex items-center justify-center gap-2.5">
+                Get Started <ArrowRight size={16}/>
+              </button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center pb-6 px-6">
+          <p className="text-slate-300 text-[11px]">© 2026 MedTrace Inc. All rights reserved.</p>
+          <p className="text-slate-300 text-[10px] mt-1">Part of the SafeHealth Network</p>
+          <div className="flex justify-center gap-4 mt-2">
+            <a href="#" className="text-slate-300 text-[10px] hover:text-slate-500 transition">Privacy Policy</a>
+            <a href="#" className="text-slate-300 text-[10px] hover:text-slate-500 transition">Terms of Service</a>
+            <a href="#" className="text-slate-300 text-[10px] hover:text-slate-500 transition">Support</a>
+          </div>
+          <p className="text-slate-400 text-[10px] mt-3">
+            Developed by <a href="https://github.com/souravlouha" target="_blank" rel="noopener noreferrer" className="text-blue-500 font-semibold hover:underline">souravlouha</a>
+          </p>
+        </div>
+
+        {/* Toast */}
+        {showToast && (
+          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-[12px] font-medium shadow-lg z-[60] animate-slide-up">
+            {toastMessage}
+          </div>
+        )}
+
+        {/* ▸ Bottom Nav */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white">
+          <div className="flex justify-around items-end pt-2 pb-3 px-4 border-t border-slate-50">
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="w-10 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <Home size={18} className="text-emerald-600"/>
+              </div>
+              <span className="text-[9px] font-semibold text-emerald-600">Home</span>
+            </div>
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="w-10 h-7 flex items-center justify-center">
+                <Search size={18} className="text-slate-300"/>
+              </div>
+              <span className="text-[9px] text-slate-300">Search</span>
+            </div>
+            <Link href="/track" className="-mt-5">
+              <div className="w-14 h-14 bg-emerald-600 rounded-2xl text-white flex items-center justify-center shadow-lg shadow-emerald-600/20 active:scale-95 transition">
+                <ScanLine size={22} strokeWidth={2.5}/>
+              </div>
+            </Link>
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="w-10 h-7 flex items-center justify-center">
+                <Clock size={18} className="text-slate-300"/>
+              </div>
+              <span className="text-[9px] text-slate-300">History</span>
+            </div>
+            <Link href="/login">
+              <div className="flex flex-col items-center gap-0.5">
+                <div className="w-10 h-7 flex items-center justify-center">
+                  <User size={18} className="text-slate-300"/>
+                </div>
+                <span className="text-[9px] text-slate-300">Profile</span>
+              </div>
+            </Link>
+          </div>
+        </div>
       </div>
 
 
@@ -675,7 +830,7 @@ export default function LandingPage() {
                       <span className="text-[10px] text-slate-400 font-medium">Part of the SafeHealth Network</span>
                    </div>
                 </div>
-                <p className="text-slate-400 text-sm font-medium">© 2025 MedTrace Inc. All rights reserved.</p>
+                <p className="text-slate-400 text-sm font-medium">© 2026 MedTrace Inc. All rights reserved.</p>
                 <div className="flex gap-8 text-sm font-bold text-slate-600">
                    <a href="#" className="hover:text-blue-600 transition">Privacy Policy</a>
                    <a href="#" className="hover:text-blue-600 transition">Terms of Service</a>

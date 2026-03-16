@@ -35,9 +35,9 @@ export async function addOperator(formData: FormData) {
   if (!name || !pin) return { success: false, error: "Name and PIN required" };
 
   try {
-    // আমরা ফেক ইমেল জেনারেট করব যাতে লগইন সিস্টেমে সমস্যা না হয়
-    // format: operator-PIN-ManufacturerID@system.local
-    const fakeEmail = `op-${pin}-${session.user.id.substring(0,4)}@medtrace.local`;
+    // Generate a unique fake email without leaking the PIN
+    const uniqueId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const fakeEmail = `op-${uniqueId}-${session.user.id.substring(0,4)}@medtrace.local`;
     
     // পিন হ্যাস করা হচ্ছে
     const hashedPassword = await bcrypt.hash(pin, 10);
@@ -62,7 +62,18 @@ export async function addOperator(formData: FormData) {
 
 // ৩. অপারেটর ডিলিট করা
 export async function deleteOperator(operatorId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
   try {
+    // Ensure the operator belongs to the calling user before deleting
+    const operator = await prisma.user.findUnique({
+      where: { id: operatorId },
+      select: { ownerId: true, role: true },
+    });
+    if (!operator || operator.role !== "OPERATOR" || operator.ownerId !== session.user.id) {
+      return { success: false, error: "Forbidden: You are not authorized to delete this operator." };
+    }
     await prisma.user.delete({ where: { id: operatorId } });
     revalidatePath("/dashboard/manufacturer/operators");
     return { success: true };
