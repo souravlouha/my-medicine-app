@@ -123,7 +123,7 @@ export default async function IncomingStockPage() {
                           </p>
 
                           {/* ✅ FORM ACTION */}
-                          <form action={receiveShipmentAction}>
+                          <form action={receiveShipmentAction as any}>
                              <input type="hidden" name="shipmentId" value={shipment.id} />
                              <button className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-emerald-600 transition shadow-lg flex items-center gap-2 active:scale-95">
                                 <PackageCheck size={18} /> Receive to Inventory

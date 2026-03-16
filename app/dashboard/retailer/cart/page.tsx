@@ -104,7 +104,7 @@ export default async function CartPage() {
                        {/* Action Row (Quantity & Delete) */}
                        <div className="mt-5 pt-4 border-t border-slate-100 flex justify-between items-center">
                           <div className="flex items-center gap-4 bg-slate-50 rounded-xl p-1 border border-slate-200">
-                             <form action={updateCartItemQuantityAction}>
+                             <form action={updateCartItemQuantityAction as any}>
                                 <input type="hidden" name="itemId" value={item.id} />
                                 <input type="hidden" name="type" value="minus" />
                                 <button className="w-9 h-9 flex items-center justify-center bg-white rounded-lg text-slate-600 shadow-sm hover:bg-slate-100 active:scale-90 disabled:opacity-50 transition" disabled={item.quantity <= 1}>
@@ -114,7 +114,7 @@ export default async function CartPage() {
 
                              <span className="font-bold text-slate-900 w-8 text-center text-lg">{item.quantity}</span>
 
-                             <form action={updateCartItemQuantityAction}>
+                             <form action={updateCartItemQuantityAction as any}>
                                 <input type="hidden" name="itemId" value={item.id} />
                                 <input type="hidden" name="type" value="plus" />
                                 <button className="w-9 h-9 flex items-center justify-center bg-slate-900 rounded-lg text-white shadow-sm hover:bg-black active:scale-90 transition">
@@ -123,7 +123,7 @@ export default async function CartPage() {
                              </form>
                           </div>
 
-                          <form action={removeFromCartAction}>
+                          <form action={removeFromCartAction as any}>
                              <input type="hidden" name="itemId" value={item.id} />
                              <button className="flex items-center gap-2 px-4 py-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition text-sm font-bold">
                                 <Trash2 size={18}/> Remove
@@ -163,7 +163,7 @@ export default async function CartPage() {
                        </span>
                     </div>
 
-                    <form action={placeOrderAction} className="space-y-4">
+                    <form action={placeOrderAction as any} className="space-y-4">
                        <button className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-slate-300 hover:bg-black transition flex items-center justify-center gap-2 active:scale-95 group">
                           <CreditCard size={20}/> Place Order <ArrowRight size={20} className="group-hover:translate-x-1 transition"/>
                        </button>
