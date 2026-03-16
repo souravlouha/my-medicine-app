@@ -64,6 +64,38 @@ export async function createShipmentAction(data: any) {
         });
       }
 
+      // C. ✅ BatchMovement records for supply chain tree
+      const distUser = await tx.user.findUnique({ where: { id: senderId }, select: { name: true } });
+      const retailerUser = await tx.user.findUnique({ where: { id: receiverId }, select: { name: true } });
+      for (const item of items) {
+        await tx.batchMovement.create({
+          data: {
+            batchId: item.batchId,
+            senderId: senderId,
+            receiverId: receiverId,
+            senderName: distUser?.name || "Distributor",
+            receiverName: retailerUser?.name || "Retailer",
+            role: "RETAILER",
+            quantity: Number(item.quantity),
+            status: "IN_TRANSIT",
+          },
+        });
+
+        // 🔗 Strip-level tracking: update currentHandlerId
+        const stripsToTransfer = await tx.unit.findMany({
+          where: { batchId: item.batchId, type: "STRIP", currentHandlerId: senderId },
+          take: Number(item.quantity),
+          orderBy: { uid: "asc" },
+          select: { id: true },
+        });
+        if (stripsToTransfer.length > 0) {
+          await tx.unit.updateMany({
+            where: { id: { in: stripsToTransfer.map((s) => s.id) } },
+            data: { currentHandlerId: receiverId },
+          });
+        }
+      }
+
       return shipment;
     });
 
@@ -85,6 +117,7 @@ export async function receiveShipmentAction(shipmentId: string) {
   const userId = session?.user?.id; // Retailer ID
 
   if (!userId) return { success: false, error: "Unauthorized" };
+  if (!shipmentId) return { success: false, error: "Shipment ID required" };
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -96,6 +129,7 @@ export async function receiveShipmentAction(shipmentId: string) {
       });
 
       if (!shipment) throw new Error("Shipment not found");
+      if (shipment.distributorId !== userId) throw new Error("Not authorized to receive this shipment");
       if (shipment.status === "DELIVERED") throw new Error("Already received!");
 
       // ২. রিটেইলারের ইনভেন্টরি আপডেট করা (লুপ)

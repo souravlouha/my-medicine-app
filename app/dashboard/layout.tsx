@@ -41,8 +41,16 @@ export default async function DashboardLayout({
         
         {/* হেডার: এখন এটি ডাটাবেসের ফ্রেশ ইউজার ডাটা দেখাবে */}
         <header className="bg-white shadow p-4 shrink-0">
-           {/* 'as any' টাইপ এরর এড়ানোর জন্য */}
-           <ManufacturerHeader user={freshUser as any} />
+           <ManufacturerHeader user={{
+             id: freshUser.id,
+             name: freshUser.name || "",
+             email: freshUser.email || "",
+             address: freshUser.address || null,
+             licenseNo: freshUser.licenseNo || null,
+             gstNo: freshUser.gstNo || null,
+             phone: freshUser.phone || null,
+             role: freshUser.role || "",
+           }} />
         </header>
 
         {/* মেইন কন্টেন্ট */}

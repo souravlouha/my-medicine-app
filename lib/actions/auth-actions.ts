@@ -1,47 +1,68 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { signIn, signOut } from "@/lib/auth"; 
+import { signIn, signOut } from "@/lib/auth";
 import { AuthError } from "next-auth";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
 
-// 1. LOGIN ACTION (Client-Side Redirect Strategy)
+// ==========================================
+// Validation Schemas
+// ==========================================
+
+const loginSchema = z.object({
+  email: z.email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+const registerSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(100),
+  email: z.email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  role: z.enum(["MANUFACTURER", "DISTRIBUTOR", "RETAILER"]),
+  licenseNo: z.string().optional(),
+});
+
+// 1. LOGIN ACTION
 export async function loginAction(formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const parsed = loginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
+  }
+
+  const { email, password } = parsed.data;
 
   try {
-    // ১. ইউজার চেক
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { role: true } 
+      select: { role: true }
     });
 
-    if (!user) return { success: false, error: "User not found!" };
+    if (!user) return { success: false, error: "Invalid credentials!" };
 
-    // ২. রোল সেটআপ
     const role = (user.role || "").toUpperCase();
     let redirectUrl = "/dashboard";
-    
+
     if (role === "MANUFACTURER") redirectUrl = "/dashboard/manufacturer";
     else if (role === "DISTRIBUTOR") redirectUrl = "/dashboard/distributor";
     else if (role === "RETAILER") redirectUrl = "/dashboard/retailer";
 
-    // ৩. লগইন চেষ্টা (redirect: false দেওয়া হলো)
-    // এটি এরর থ্রো করবে না, রেজাল্ট রিটার্ন করবে
     await signIn("credentials", {
       email,
       password,
-      redirect: false, 
+      redirect: false,
     });
 
-    // ৪. সব ঠিক থাকলে URL ফেরত পাঠাও
-    return { success: true, redirectUrl }; 
+    return { success: true, redirectUrl };
 
   } catch (error) {
     if (error instanceof AuthError) {
       if (error.type === "CredentialsSignin") return { success: false, error: "Invalid credentials!" };
     }
-    // অন্য কোনো এরর হলে
     console.error("Login error:", error);
     return { success: false, error: "Login failed! Check credentials." };
   }
@@ -52,18 +73,22 @@ export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
 }
 
-// 3. REGISTER ACTION (যা ছিল তাই)
-import bcrypt from "bcryptjs";
+// 3. REGISTER ACTION
 export async function registerAction(formData: FormData) {
-  const name = formData.get("name") as string;
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const role = formData.get("role") as string;
-  const licenseNo = formData.get("licenseNo") as string;
+  const parsed = registerSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    password: formData.get("password"),
+    role: formData.get("role"),
+    licenseNo: formData.get("licenseNo"),
+  });
 
-  if (!name || !email || !password || !role) {
-    return { success: false, error: "All fields are required!" };
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0].message };
   }
+
+  const { name, email, password, role, licenseNo } = parsed.data;
+
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) return { success: false, error: "Email already exists!" };

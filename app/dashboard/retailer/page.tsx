@@ -150,7 +150,7 @@ export default async function RetailerDashboard() {
                 <Link href="/dashboard/retailer/pos" className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition active:scale-95">
                     <Plus size={18}/> New Sale
                 </Link>
-                <Link href="/dashboard/retailer/catalog" className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition active:scale-95">
+                <Link href="/dashboard/retailer/shop" className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition active:scale-95">
                     <ShoppingCart size={18}/> Restock
                 </Link>
             </div>
