@@ -43,21 +43,28 @@ export async function recallBatchAction(formData: FormData) {
       return { success: false, error: "Forbidden: You are not authorized to recall this batch." };
     }
 
-    // ৪. রিকল রেকর্ড তৈরি করা
-    await prisma.recall.create({
-      data: {
-        batchId: batch.id,
-        reason: reason,
-        status: "ACTIVE",
-        // ✅ FIX: issuedBy ফিল্ড যোগ করা হলো (এটি মিসিং ছিল)
-        issuedBy: userId 
-      }
-    });
+    // ৪. রিকল রেকর্ড তৈরি + ইউনিট আপডেট (একই ট্রানজ্যাকশনে)
+    await prisma.$transaction(async (tx) => {
+      // Duplicate recall check
+      const existingRecall = await tx.recall.findFirst({
+        where: { batchId: batch.id, status: "ACTIVE" }
+      });
+      if (existingRecall) throw new Error("Batch already has an active recall");
 
-    // ৫. ইউনিটের স্ট্যাটাস আপডেট করা
-    await prisma.unit.updateMany({
-      where: { batchId: batch.id },
-      data: { status: "RECALLED" }
+      await tx.recall.create({
+        data: {
+          batchId: batch.id,
+          reason: reason,
+          status: "ACTIVE",
+          issuedBy: userId 
+        }
+      });
+
+      // ৫. ইউনিটের স্ট্যাটাস আপডেট করা
+      await tx.unit.updateMany({
+        where: { batchId: batch.id },
+        data: { status: "RECALLED" }
+      });
     });
 
     revalidatePath("/dashboard/manufacturer/recall");

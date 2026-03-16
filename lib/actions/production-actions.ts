@@ -86,6 +86,13 @@ export async function getPrintJobs() {
 
 // ৪. Verify Operator Access Code
 export async function verifyOperatorCode(code: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
+  if (!code || typeof code !== "string" || code.length < 4) {
+    return { success: false, error: "Invalid access code format" };
+  }
+
   try {
     const job = await prisma.printJob.findUnique({
       where: { accessCode: code },
@@ -105,6 +112,9 @@ export async function verifyOperatorCode(code: string) {
 
 // ৫. অপারেটরের জন্য জবের ডিটেইলস আনা
 export async function getJobDetails(code: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
   try {
     const job = await prisma.printJob.findUnique({
       where: { accessCode: code },
@@ -126,6 +136,13 @@ export async function getJobDetails(code: string) {
 
 // ৬. প্রিন্ট আপডেট করা
 export async function updatePrintProgress(jobId: string, printedCount: number) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
+  if (!jobId || typeof printedCount !== "number" || printedCount < 0) {
+    return { success: false, error: "Invalid parameters" };
+  }
+
   try {
     await prisma.printJob.update({
       where: { id: jobId },
@@ -133,7 +150,7 @@ export async function updatePrintProgress(jobId: string, printedCount: number) {
     });
     return { success: true };
   } catch (error) {
-    return { success: false };
+    return { success: false, error: "Update failed" };
   }
 }
 
@@ -177,8 +194,11 @@ export async function toggleJobStatus(jobId: string, action: 'PAUSE' | 'RESUME' 
   }
 }
 
-// ✅ ৯. অপারেটরের আগের কাজের ইতিহাস (History) আনা - FIXED updatedAt Error
+// ৯. অপারেটরের আগের কাজের ইতিহাস (History) আনা
 export async function getOperatorHistory(operatorId: string) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, data: [] };
+
   try {
     const history = await prisma.printJob.findMany({
       where: {
@@ -188,7 +208,6 @@ export async function getOperatorHistory(operatorId: string) {
       include: {
         batch: { include: { product: true } }
       },
-      // ✅ updatedAt এর বদলে createdAt ব্যবহার করা হয়েছে
       orderBy: { createdAt: 'desc' }, 
       take: 5 
     });

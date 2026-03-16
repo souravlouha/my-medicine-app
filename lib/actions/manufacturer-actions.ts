@@ -151,7 +151,10 @@ export async function createAdvancedBatchAction(formData: FormData) {
   const totalCartons = parseInt(formData.get("totalCartons") as string);
   const boxesPerCarton = parseInt(formData.get("boxesPerCarton") as string);
   const stripsPerBox = parseInt(formData.get("stripsPerBox") as string);
-
+  if ([totalCartons, boxesPerCarton, stripsPerBox].some(v => isNaN(v) || v <= 0)) {
+    return { success: false, error: "Invalid packaging values" };
+  }
+  if (isNaN(mrp) || mrp < 0) return { success: false, error: "Invalid MRP" };
   // মোট কোয়ান্টিটি ক্যালকুলেশন
   const totalQuantity = totalCartons * boxesPerCarton * stripsPerBox;
 
@@ -191,8 +194,8 @@ export async function createAdvancedBatchAction(formData: FormData) {
   }
 }
 
-// ✅ Helper: Generate Unit Hierarchy
-export async function createBatchWithHierarchy(
+// Helper: Generate Unit Hierarchy (internal — not a server action)
+async function createBatchWithHierarchy(
   batchId: string, 
   manufacturerId: string, 
   totalCartons: number, 
@@ -267,10 +270,18 @@ export async function getDistributors() {
 
 // ✅ Approve Order (Distributor Request)
 export async function approveOrderAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
   const orderId = formData.get("orderId") as string;
   if (!orderId) return { success: false, error: "Order ID missing" };
 
   try {
+    // Verify this order belongs to the logged-in manufacturer
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { receiverId: true, status: true } });
+    if (!order || order.receiverId !== session.user.id) return { success: false, error: "Order not found" };
+    if (order.status !== "PENDING") return { success: false, error: "Only pending orders can be approved" };
+
     await prisma.order.update({
       where: { id: orderId },
       data: { status: "APPROVED" }
@@ -285,7 +296,11 @@ export async function approveOrderAction(formData: FormData) {
 
 // ✅ Ship Approved Order (Auto Shipment Creation)
 export async function shipApprovedOrderAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
   const orderId = formData.get("orderId") as string;
+  if (!orderId) return { success: false, error: "Order ID missing" };
   
   try {
     const order = await prisma.order.findUnique({
@@ -293,8 +308,9 @@ export async function shipApprovedOrderAction(formData: FormData) {
       include: { items: true }
     });
 
-    if (!order) throw new Error("Order not found");
-    if (order.status !== "APPROVED") throw new Error("Order must be approved first");
+    if (!order) return { success: false, error: "Order not found" };
+    if (order.receiverId !== session.user.id) return { success: false, error: "Forbidden" };
+    if (order.status !== "APPROVED") return { success: false, error: "Order must be approved first" };
 
     await prisma.$transaction(async (tx) => {
       const shipmentId = `SHP-${Date.now().toString().slice(-6)}`;
@@ -341,6 +357,38 @@ export async function shipApprovedOrderAction(formData: FormData) {
         }
       });
 
+      // ✅ BatchMovement record for supply chain tracking
+      const senderUser = await tx.user.findUnique({ where: { id: order.receiverId }, select: { name: true } });
+      const receiverUser = await tx.user.findUnique({ where: { id: order.senderId }, select: { name: true, role: true } });
+      for (const item of shipmentItemsData) {
+        await tx.batchMovement.create({
+          data: {
+            batchId: item.batchId,
+            senderId: order.receiverId,
+            receiverId: order.senderId,
+            senderName: senderUser?.name || "Manufacturer",
+            receiverName: receiverUser?.name || "Distributor",
+            role: receiverUser?.role as any || "DISTRIBUTOR",
+            quantity: item.quantity,
+            status: "IN_TRANSIT",
+          },
+        });
+
+        // 🔗 Strip-level tracking: update currentHandlerId
+        const stripsToTransfer = await tx.unit.findMany({
+          where: { batchId: item.batchId, type: "STRIP", currentHandlerId: order.receiverId },
+          take: item.quantity,
+          orderBy: { uid: "asc" },
+          select: { id: true },
+        });
+        if (stripsToTransfer.length > 0) {
+          await tx.unit.updateMany({
+            where: { id: { in: stripsToTransfer.map((s) => s.id) } },
+            data: { currentHandlerId: order.senderId },
+          });
+        }
+      }
+
       // অর্ডার স্ট্যাটাস আপডেট
       await tx.order.update({
         where: { id: orderId },
@@ -364,10 +412,17 @@ export async function shipApprovedOrderAction(formData: FormData) {
 
 // ✅ Reject Order
 export async function rejectOrderAction(formData: FormData) {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
     const orderId = formData.get("orderId") as string;
-    if (!orderId) return;
+    if (!orderId) return { success: false, error: "Order ID missing" };
   
     try {
+      // Verify ownership
+      const order = await prisma.order.findUnique({ where: { id: orderId }, select: { receiverId: true, status: true } });
+      if (!order || order.receiverId !== session.user.id) return { success: false, error: "Order not found" };
+      if (order.status !== "PENDING" && order.status !== "APPROVED") return { success: false, error: "Cannot reject this order" };
       await prisma.order.update({
         where: { id: orderId },
         data: { status: "CANCELLED" }
@@ -420,6 +475,36 @@ export async function createShipmentAction(formData: FormData) {
         where: { id: inventory.id },
         data: { currentStock: { decrement: quantity } }
       });
+
+      // ✅ BatchMovement record for supply chain tree
+      const mfgUser = await tx.user.findUnique({ where: { id: userId }, select: { name: true } });
+      const distUser = await tx.user.findUnique({ where: { id: distributorId }, select: { name: true } });
+      await tx.batchMovement.create({
+        data: {
+          batchId: batchId,
+          senderId: userId,
+          receiverId: distributorId,
+          senderName: mfgUser?.name || "Manufacturer",
+          receiverName: distUser?.name || "Distributor",
+          role: "DISTRIBUTOR",
+          quantity: quantity,
+          status: "IN_TRANSIT",
+        },
+      });
+
+      // 🔗 Strip-level tracking: update currentHandlerId
+      const stripsToTransfer = await tx.unit.findMany({
+        where: { batchId, type: "STRIP", currentHandlerId: userId },
+        take: quantity,
+        orderBy: { uid: "asc" },
+        select: { id: true },
+      });
+      if (stripsToTransfer.length > 0) {
+        await tx.unit.updateMany({
+          where: { id: { in: stripsToTransfer.map((s) => s.id) } },
+          data: { currentHandlerId: distributorId },
+        });
+      }
     });
 
     revalidatePath("/dashboard/manufacturer");
@@ -445,13 +530,21 @@ export async function recallBatchAction(formData: FormData) {
   const reason = formData.get("reason") as string;
 
   try {
-    await prisma.recall.create({
-      data: { batchId, reason, issuedBy: userId, status: "ACTIVE" }
-    });
+    await prisma.$transaction(async (tx) => {
+      // Check for duplicate active recall
+      const existingRecall = await tx.recall.findFirst({
+        where: { batchId, status: "ACTIVE" }
+      });
+      if (existingRecall) throw new Error("Batch already has an active recall");
 
-    await prisma.unit.updateMany({
-      where: { batchId },
-      data: { status: "RECALLED" }
+      await tx.recall.create({
+        data: { batchId, reason, issuedBy: userId, status: "ACTIVE" }
+      });
+
+      await tx.unit.updateMany({
+        where: { batchId },
+        data: { status: "RECALLED" }
+      });
     });
 
     revalidatePath("/dashboard/manufacturer/recall");
@@ -503,6 +596,10 @@ export async function createBulkShipmentAction(formData: FormData) {
         }
       });
 
+      // ✅ Get names for BatchMovement
+      const mfgUser = await tx.user.findUnique({ where: { id: userId }, select: { name: true } });
+      const distUser = await tx.user.findUnique({ where: { id: distributorId }, select: { name: true } });
+
       for (const item of items) {
         const inventory = await tx.inventory.findFirst({
             where: { userId: userId, batchId: item.id }
@@ -516,6 +613,34 @@ export async function createBulkShipmentAction(formData: FormData) {
             where: { id: inventory.id },
             data: { currentStock: { decrement: item.quantity } }
         });
+
+        // ✅ BatchMovement record for each batch in bulk shipment
+        await tx.batchMovement.create({
+          data: {
+            batchId: item.id,
+            senderId: userId,
+            receiverId: distributorId,
+            senderName: mfgUser?.name || "Manufacturer",
+            receiverName: distUser?.name || "Distributor",
+            role: "DISTRIBUTOR",
+            quantity: item.quantity,
+            status: "IN_TRANSIT",
+          },
+        });
+
+        // 🔗 Strip-level tracking: update currentHandlerId
+        const stripsToTransfer = await tx.unit.findMany({
+          where: { batchId: item.id, type: "STRIP", currentHandlerId: userId },
+          take: item.quantity,
+          orderBy: { uid: "asc" },
+          select: { id: true },
+        });
+        if (stripsToTransfer.length > 0) {
+          await tx.unit.updateMany({
+            where: { id: { in: stripsToTransfer.map((s) => s.id) } },
+            data: { currentHandlerId: distributorId },
+          });
+        }
       }
     });
 
@@ -556,12 +681,17 @@ export async function updateProfileAction(formData: FormData) {
 
 // ✅ Create Distributor Account
 export async function createDistributor(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const licenseNo = formData.get("licenseNo") as string;
   
-  const gstNo = formData.get("gstNo") as string; 
+  const gstNo = formData.get("gstNo") as string;
+
+  if (!name || !email || !password) return { success: false, error: "Name, email, and password are required" };
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);

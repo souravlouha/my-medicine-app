@@ -89,12 +89,12 @@ export default function CreateBatchForm({ products }: { products: any[] }) {
         </div>
         
         {/* 🔥 THE FULL HIERARCHY TREE VIEW 🔥 */}
-        <div className="space-y-8 print-area">
+      <div id="printable-qr-section" className="space-y-8 print-area">
            {Array.from({ length: totalCartons }).map((_, cIndex) => {
              const cartonId = `CARTON-${createdBatch.no}-${cIndex+1}`;
              
              return (
-             <div key={cIndex} className="border-4 border-gray-800 rounded-3xl p-8 bg-white relative break-inside-avoid">
+             <div key={cIndex} className="qr-card-print border-4 border-gray-800 rounded-3xl p-8 bg-white relative break-inside-avoid">
                
                <div className="flex items-center gap-6 border-b-2 border-gray-200 pb-6 mb-6">
                   <div className="bg-white p-2 border border-gray-200 rounded-lg">

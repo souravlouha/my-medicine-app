@@ -5,19 +5,30 @@ import EditProfileModal from "./EditProfileModal"; // এই ফাইলটি 
 
 interface HeaderProps {
   user: {
-    id: string; // id যোগ করা হয়েছে যাতে এডিট করার সময় কাজে লাগে
+    id: string;
     name: string;
-    fullAddress: string | null;
+    address: string | null;
     licenseNo: string | null;
     gstNo: string | null;
     phone: string | null;
     email: string;
+    role: string;
   };
 }
 
 export default function ManufacturerHeader({ user }: HeaderProps) {
   // Modal ওপেন বা ক্লোজ করার জন্য স্টেট
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Role-aware badge
+  const roleBadge: Record<string, { label: string; color: string }> = {
+    MANUFACTURER: { label: "Verified Manufacturer", color: "bg-green-100 text-green-600" },
+    DISTRIBUTOR: { label: "Verified Distributor", color: "bg-blue-100 text-blue-600" },
+    RETAILER: { label: "Verified Retailer", color: "bg-emerald-100 text-emerald-600" },
+    ADMIN: { label: "Admin", color: "bg-purple-100 text-purple-600" },
+    OPERATOR: { label: "Operator", color: "bg-yellow-100 text-yellow-600" },
+  };
+  const badge = roleBadge[user.role] || roleBadge.MANUFACTURER;
 
   return (
     <>
@@ -28,12 +39,12 @@ export default function ManufacturerHeader({ user }: HeaderProps) {
               <h1 className="text-3xl font-black text-[#0D1B3E] uppercase tracking-tighter">
                 {user.name}
               </h1>
-              <span className="bg-green-100 text-green-600 text-[10px] font-black px-3 py-1 rounded-full uppercase italic tracking-tighter">
-                Verified Manufacturer
+              <span className={`${badge.color} text-[10px] font-black px-3 py-1 rounded-full uppercase italic tracking-tighter`}>
+                {badge.label}
               </span>
             </div>
             <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">
-              {user.fullAddress || "Address not updated"}
+              {user.address || "Address not updated"}
             </p>
           </div>
 

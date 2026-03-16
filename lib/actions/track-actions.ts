@@ -543,3 +543,369 @@ export async function trackMedicineAction(query: string) {
     },
   };
 }
+
+// =========================================================
+// 6. SUPPLY CHAIN TREE ACTION (Role-filtered)
+//    Returns a hierarchical tree of who sent what to whom.
+//    Each role only sees their own relevant supply chain.
+// =========================================================
+
+export interface SupplyChainNode {
+  id: string;
+  name: string;
+  role: "MANUFACTURER" | "DISTRIBUTOR" | "RETAILER" | "CONSUMER";
+  quantity: number;
+  date: string;
+  location: string | null;
+  children: SupplyChainNode[];
+  strips?: string[]; // Strip UIDs held by this entity
+}
+
+export interface SupplyChainTreeResult {
+  batchNumber: string;
+  product: {
+    name: string;
+    genericName: string | null;
+    type: string;
+    strength: string | null;
+  };
+  manufacturer: {
+    name: string;
+    address: string | null;
+  };
+  mfgDate: string;
+  expDate: string;
+  mrp: number;
+  totalQuantity: number;
+  isRecalled: boolean;
+  isExpired: boolean;
+  tree: SupplyChainNode;
+}
+
+export async function getSupplyChainTreeAction(
+  batchNumber: string
+): Promise<{ success: true; data: SupplyChainTreeResult } | { success: false; error: string }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: "Please login to view supply chain." };
+  }
+
+  const parsed = trackingIdSchema.safeParse(batchNumber);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid batch number." };
+  }
+
+  try {
+    const userId = session.user.id;
+
+    // Get fresh user from DB for accurate role
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, name: true },
+    });
+
+    if (!currentUser) {
+      return { success: false, error: "User not found." };
+    }
+
+    const userRole = currentUser.role; // MANUFACTURER | DISTRIBUTOR | RETAILER
+
+    // Resolve batch (try batchNumber first, then UID)
+    let batch = await prisma.batch.findUnique({
+      where: { batchNumber: parsed.data },
+      include: {
+        product: {
+          select: { name: true, genericName: true, type: true, strength: true },
+        },
+        manufacturer: {
+          select: { id: true, name: true, address: true },
+        },
+        movements: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            senderId: true,
+            receiverId: true,
+            senderName: true,
+            receiverName: true,
+            role: true,
+            quantity: true,
+            status: true,
+            location: true,
+            createdAt: true,
+            parentId: true,
+          },
+        },
+        recalls: {
+          where: { status: "ACTIVE" },
+          select: { id: true },
+        },
+      },
+    });
+
+    // If not found by batchNumber, try as Unit UID
+    if (!batch) {
+      const unit = await prisma.unit.findUnique({
+        where: { uid: parsed.data },
+        select: { batchId: true },
+      });
+      if (unit) {
+        batch = await prisma.batch.findUnique({
+          where: { id: unit.batchId },
+          include: {
+            product: {
+              select: { name: true, genericName: true, type: true, strength: true },
+            },
+            manufacturer: {
+              select: { id: true, name: true, address: true },
+            },
+            movements: {
+              orderBy: { createdAt: "asc" },
+              select: {
+                id: true,
+                senderId: true,
+                receiverId: true,
+                senderName: true,
+                receiverName: true,
+                role: true,
+                quantity: true,
+                status: true,
+                location: true,
+                createdAt: true,
+                parentId: true,
+              },
+            },
+            recalls: {
+              where: { status: "ACTIVE" },
+              select: { id: true },
+            },
+          },
+        });
+      }
+    }
+
+    if (!batch) {
+      return { success: false, error: "No batch found for this ID." };
+    }
+
+    const isExpired = new Date() > batch.expDate;
+    const isRecalled = batch.recalls.length > 0;
+
+    // ====== BUILD THE FULL TREE ======
+
+    // Root = Manufacturer
+    const fullTree: SupplyChainNode = {
+      id: batch.manufacturer.id,
+      name: batch.manufacturer.name,
+      role: "MANUFACTURER",
+      quantity: batch.totalQuantity,
+      date: batch.createdAt.toISOString(),
+      location: batch.manufacturer.address ?? null,
+      children: [],
+    };
+
+    // Group movements by role
+    const distributorMovements = batch.movements.filter((m) => m.role === "DISTRIBUTOR");
+    const retailerMovements = batch.movements.filter((m) => m.role === "RETAILER");
+    const consumerMovements = batch.movements.filter((m) => m.role === "CONSUMER");
+
+    // Build distributor nodes
+    const distributorNodes: Map<string, SupplyChainNode> = new Map();
+    for (const dm of distributorMovements) {
+      const key = dm.receiverId ?? dm.receiverName;
+      const existing = distributorNodes.get(key);
+      if (existing) {
+        existing.quantity += dm.quantity;
+      } else {
+        distributorNodes.set(key, {
+          id: dm.receiverId ?? dm.id,
+          name: dm.receiverName,
+          role: "DISTRIBUTOR",
+          quantity: dm.quantity,
+          date: dm.createdAt.toISOString(),
+          location: dm.location ?? null,
+          children: [],
+        });
+      }
+    }
+
+    // Build retailer children under their distributor sender
+    for (const rm of retailerMovements) {
+      const retailerNode: SupplyChainNode = {
+        id: rm.receiverId ?? rm.id,
+        name: rm.receiverName,
+        role: "RETAILER",
+        quantity: rm.quantity,
+        date: rm.createdAt.toISOString(),
+        location: rm.location ?? null,
+        children: [],
+      };
+
+      // Add consumer sales under retailer
+      const consumerSales = consumerMovements.filter(
+        (cm) => cm.senderId === (rm.receiverId ?? "")
+      );
+      for (const cs of consumerSales) {
+        retailerNode.children.push({
+          id: cs.id,
+          name: cs.receiverName || "Consumer",
+          role: "CONSUMER",
+          quantity: cs.quantity,
+          date: cs.createdAt.toISOString(),
+          location: cs.location ?? null,
+          children: [],
+        });
+      }
+
+      // Find which distributor sent to this retailer
+      const parentDistKey = rm.senderId;
+      const parentDist = distributorNodes.get(parentDistKey);
+      if (parentDist) {
+        // Check if same retailer already exists, merge quantities
+        const existingRetailer = parentDist.children.find(
+          (c) => c.id === retailerNode.id
+        );
+        if (existingRetailer) {
+          existingRetailer.quantity += retailerNode.quantity;
+          existingRetailer.children.push(...retailerNode.children);
+        } else {
+          parentDist.children.push(retailerNode);
+        }
+      } else {
+        // Orphan retailer (direct from manufacturer perhaps) — attach to root
+        fullTree.children.push(retailerNode);
+      }
+    }
+
+    // Attach distributors to root
+    for (const dNode of distributorNodes.values()) {
+      fullTree.children.push(dNode);
+    }
+
+    // ====== STRIP-LEVEL TRACKING ======
+    // Query all STRIP units for this batch, grouped by currentHandlerId
+    const allStrips = await prisma.unit.findMany({
+      where: { batchId: batch.id, type: "STRIP" },
+      select: { uid: true, currentHandlerId: true },
+      orderBy: { uid: "asc" },
+    });
+
+    // Group strips by handler
+    const stripsByHandler = new Map<string, string[]>();
+    for (const strip of allStrips) {
+      const handler = strip.currentHandlerId || batch.manufacturer.id;
+      const list = stripsByHandler.get(handler) || [];
+      list.push(strip.uid);
+      stripsByHandler.set(handler, list);
+    }
+
+    // Recursive function to assign strips to tree nodes
+    function assignStrips(node: SupplyChainNode) {
+      const nodeStrips = stripsByHandler.get(node.id);
+      if (nodeStrips && nodeStrips.length > 0) {
+        node.strips = nodeStrips;
+      }
+      for (const child of node.children) {
+        assignStrips(child);
+      }
+    }
+    assignStrips(fullTree);
+
+    // ====== ROLE-BASED FILTERING ======
+    let filteredTree: SupplyChainNode;
+
+    if (userRole === "MANUFACTURER") {
+      // Manufacturer sees ONLY their own batch tree
+      if (batch.manufacturer.id !== userId) {
+        return { success: false, error: "This batch does not belong to you." };
+      }
+      filteredTree = fullTree; // Full downstream visibility
+
+    } else if (userRole === "DISTRIBUTOR") {
+      // Distributor sees: manufacturer → themselves → their retailers
+      // They can see if they get same medicine from multiple manufacturers
+      // But cannot see other distributors
+
+      const myDistNode = distributorNodes.get(userId);
+      if (!myDistNode) {
+        return {
+          success: false,
+          error: "You have no record of receiving this batch.",
+        };
+      }
+
+      // Build: manufacturer → this distributor → their retailers
+      filteredTree = {
+        ...fullTree,
+        children: [myDistNode],
+      };
+
+    } else if (userRole === "RETAILER") {
+      // Retailer sees: manufacturer → ALL distributors who sent to them → themselves
+      // A retailer can receive the same medicine from multiple distributors
+
+      const myDistributorNodes: SupplyChainNode[] = [];
+
+      for (const dNode of distributorNodes.values()) {
+        const found = dNode.children.find((r) => r.id === userId);
+        if (found) {
+          // Include this distributor with only this retailer as child
+          myDistributorNodes.push({
+            ...dNode,
+            children: [found],
+          });
+        }
+      }
+
+      // Also check direct (orphan) retailers on root
+      const orphanRetailer = fullTree.children.find(
+        (c) => c.id === userId && c.role === "RETAILER"
+      ) ?? null;
+
+      if (myDistributorNodes.length === 0 && !orphanRetailer) {
+        return {
+          success: false,
+          error: "You have no record of receiving this batch.",
+        };
+      }
+
+      const filteredChildren: SupplyChainNode[] = [...myDistributorNodes];
+      if (orphanRetailer) {
+        filteredChildren.push(orphanRetailer);
+      }
+
+      filteredTree = {
+        ...fullTree,
+        children: filteredChildren,
+      };
+
+    } else if (userRole === "ADMIN") {
+      // Admin sees everything
+      filteredTree = fullTree;
+    } else {
+      return { success: false, error: "Your role cannot access supply chain tracking." };
+    }
+
+    return {
+      success: true,
+      data: {
+        batchNumber: batch.batchNumber,
+        product: batch.product,
+        manufacturer: {
+          name: batch.manufacturer.name,
+          address: batch.manufacturer.address,
+        },
+        mfgDate: batch.mfgDate.toISOString(),
+        expDate: batch.expDate.toISOString(),
+        mrp: batch.mrp,
+        totalQuantity: batch.totalQuantity,
+        isRecalled: batch.recalls.length > 0,
+        isExpired,
+        tree: filteredTree,
+      },
+    };
+  } catch (error) {
+    console.error("getSupplyChainTreeAction error:", error);
+    return { success: false, error: "Failed to fetch supply chain data." };
+  }
+}

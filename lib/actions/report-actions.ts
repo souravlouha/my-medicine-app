@@ -19,10 +19,9 @@ export async function submitReportAction(formData: FormData) {
     await prisma.report.create({
       data: {
         medicineName,
-        // ব্যাচ নম্বর না থাকলে null হিসেবে যাবে (খালি স্ট্রিং যাবে না)
         batchNo: batchNo || null, 
         location,
-        description,
+        description: description || "",
         status: "PENDING"
       }
     });

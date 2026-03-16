@@ -35,9 +35,9 @@ export async function addOperator(formData: FormData) {
   if (!name || !pin) return { success: false, error: "Name and PIN required" };
 
   try {
-    // আমরা ফেক ইমেল জেনারেট করব যাতে লগইন সিস্টেমে সমস্যা না হয়
-    // format: operator-PIN-ManufacturerID@system.local
-    const fakeEmail = `op-${pin}-${session.user.id.substring(0,4)}@medtrace.local`;
+    // Generate a unique fake email without leaking the PIN
+    const uniqueId = `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const fakeEmail = `op-${uniqueId}-${session.user.id.substring(0,4)}@medtrace.local`;
     
     // পিন হ্যাস করা হচ্ছে
     const hashedPassword = await bcrypt.hash(pin, 10);
